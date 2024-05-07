@@ -1,6 +1,9 @@
 name: cdktf-diff
 description: Execute cdktf diff, parse STDOUT/STDERR output, and return outputs based on the outcomes.
 inputs:
+  github_token:
+    required: true
+    description: GITHUB_TOKEN to use GitHub API. Simply specify secrets.GITHUB_TOKEN.
   ref:
     description: Branch/Commit/Tag to use
     type: string
@@ -41,7 +44,7 @@ runs:
     - id: jobid_action
       uses: Tiryoh/gha-jobid-action@v1
       with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
+        github_token: ${{ inputs.GITHUB_TOKEN }}
         job_name: ${{ inputs.job_name }}
 
     - uses: hashicorp/setup-terraform@v3
