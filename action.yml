@@ -19,8 +19,6 @@ inputs:
   output_filename:
     description: Name of the file this jobs outputs will be saved into.
     required: true
-  testing_file_path:
-    description: File only used for testing purposes; not meant to be an actual input.
 outputs:
   result_code:
     description: Similar to exitcode behavior for Terraform, not yet supported by CDKTF.  0 = Succeeded with empty diff (no changes), 1 = Error, 2 = Succeeded with non-empty diff (changes present)
@@ -81,11 +79,7 @@ runs:
 
         # show output in CLI/GitHub and also send to file for later parsing
         DIFF_FILE_PATH="${TMPDIR}cdktf-diff.txt"
-        ### CI=1 npx cdktf diff ${{ inputs.stack }} | tee $DIFF_FILE_PATH
-
-        ### NOT AN ACTUAL USE CASE; ONLY FOR TESTING ###
-        ### Simulate console output at a specific rate to STDOUT, while also being saved to $DIFF_FILE_PATH
-        cat ${{ inputs.testing_file_path }} | perl -pe 'select undef,undef,undef,.05' | tee $DIFF_FILE_PATH
+        CI=1 npx cdktf diff ${{ inputs.stack }} | tee $DIFF_FILE_PATH
 
         # If planning failed due to an error, set the outputs and return.
         if cat $DIFF_FILE_PATH | sed -r "s/\\x1B\\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" | grep "Planning failed. Terraform encountered an error while generating this plan." > /dev/null ; then
