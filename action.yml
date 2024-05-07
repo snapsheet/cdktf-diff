@@ -1,0 +1,128 @@
+name: cdktf-diff
+description: Execute cdktf diff, parse STDOUT/STDERR output, and return outputs based on the outcomes.
+inputs:
+  ref:
+    description: Branch/Commit/Tag to use
+    type: string
+  stack:
+    description: Full name of the CDKTF stack to diff.
+    type: string
+  job_name:
+    description: jobs.<job-id>.name of this workflow job. This is needed to get the job ID via query.
+    required: true
+  terraform_version:
+    default: 1.8.0
+    description: The version of Terraform to use
+  working_directory:
+    default: ./
+    description: Working directory path that contains your cdktf code.
+  output_filename:
+    description: Name of the file this jobs outputs will be saved into.
+    required: true
+  testing_file_path:
+    description: File only used for testing purposes; not meant to be an actual input.
+outputs:
+  result_code:
+    description: Similar to exitcode behavior for Terraform, not yet supported by CDKTF.  0 = Succeeded with empty diff (no changes), 1 = Error, 2 = Succeeded with non-empty diff (changes present)
+    value: ${{ steps.diff.outputs.result_code }}
+  summary:
+    description: Single string of output to summarize the results.
+    value: ${{ steps.diff.outputs.summary }}
+  html_url:
+    description: Direct link to this job, which shows the full execution output.
+    value: ${{ steps.jobid_action.outputs.html_url }}
+  stack:
+    description: Full name of the CDKTF stack used for the diff.
+    value: ${{ inputs.stack }}
+  job_id:
+    description: ID of this job
+    value: ${{ steps.jobid_action.outputs.job_id }}
+runs:
+  using: composite
+  steps:
+    - id: jobid_action
+      uses: Tiryoh/gha-jobid-action@v1
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        job_name: ${{ inputs.job_name }}
+
+    - uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ inputs.terraform_version }}
+
+    - uses: actions/checkout@v4
+      id: checkout
+      with:
+        fetch-depth: 0
+        ref: ${{ inputs.ref }}
+
+    - name: Load Configuration
+      id: configurations
+      shell: bash
+      run: |
+        cd ${{ inputs.working_directory }}
+        echo "node_version=$(cat .nvmrc)" >> $GITHUB_OUTPUT
+
+    - uses: actions/setup-node@v4
+      with:
+        node-version: ${{ steps.configurations.outputs.node_version }}
+
+    - name: Install Node Dependencies
+      shell: bash
+      run: |
+        cd ${{ inputs.working_directory }}
+        npm ci
+
+    - name: Run Diff
+      id: diff
+      shell: bash
+      run: |
+        cd ${{ inputs.working_directory }}
+
+        # show output in CLI/GitHub and also send to file for later parsing
+        DIFF_FILE_PATH="${TMPDIR}cdktf-diff.txt"
+        ### CI=1 npx cdktf diff ${{ inputs.stack }} | tee $DIFF_FILE_PATH
+
+        ### NOT AN ACTUAL USE CASE; ONLY FOR TESTING ###
+        ### Simulate console output at a specific rate to STDOUT, while also being saved to $DIFF_FILE_PATH
+        cat ${{ inputs.testing_file_path }} | perl -pe 'select undef,undef,undef,.05' | tee $DIFF_FILE_PATH
+
+        # If planning failed due to an error, set the outputs and return.
+        if cat $DIFF_FILE_PATH | sed -r "s/\\x1B\\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" | grep "Planning failed. Terraform encountered an error while generating this plan." > /dev/null ; then
+          echo "result_code=1" >> $GITHUB_OUTPUT
+          SUMMARY=$(cat $DIFF_FILE_PATH | grep "Error: " | xargs | sed -r "s/\\x1B\\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g")
+          echo "summary=$SUMMARY" >> $GITHUB_OUTPUT
+          exit 0 # return code zero so we don't break the rest of the workflow
+        fi        
+
+        # If there are no changes, set the outputs and return.
+        if cat $DIFF_FILE_PATH | sed -r "s/\\x1B\\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" | grep "No changes. Your infrastructure matches the configuration." > /dev/null ; then
+          SUMMARY="No changes. Your infrastructure matches the configuration."
+          echo "result_code=0" >> $GITHUB_OUTPUT
+          echo "summary=$SUMMARY" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+
+        # If there is a plan, set the outputs and return.
+        if cat $DIFF_FILE_PATH | sed -r "s/\\x1B\\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" | grep "Plan:" > /dev/null ; then
+          echo "result_code=2" >> $GITHUB_OUTPUT
+          SUMMARY=$(cat $DIFF_FILE_PATH | grep "Plan:" | xargs | sed -r "s/\\x1B\\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g")
+          echo "summary=$SUMMARY" >> $GITHUB_OUTPUT
+          exit 0 # return code zero so we don't break the rest of the workflow
+        fi
+
+        echo "Error: Could not determine if diff ran successfully."
+        echo "result_code=1"
+        exit 1
+
+    - name: Dump Outputs to File
+      shell: bash
+      run: |
+        TOTAL_OUTPUTS='{"result_code":${{ steps.diff.outputs.result_code }},"summary":"${{ steps.diff.outputs.summary }}","html_url":"${{ steps.jobid_action.outputs.html_url }}","stack":"${{ inputs.stack }}","job_id":"${{ steps.jobid_action.outputs.job_id }}","node_version":"${{ steps.configurations.outputs.node_version }}","terraform_version":"${{ inputs.terraform_version }}"}'
+        echo $TOTAL_OUTPUTS > ${{ inputs.working_directory }}/${{ inputs.output_filename }}
+
+    - uses: actions/upload-artifact@v4
+      name: Save Outputs
+      with:
+        name: ${{ steps.jobid_action.outputs.job_id }}
+        path: ${{ inputs.working_directory }}/${{ inputs.output_filename }}
