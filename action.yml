@@ -2,45 +2,44 @@ name: cdktf-diff
 description: Execute cdktf diff, parse STDOUT/STDERR output, and return outputs based on the outcomes.
 inputs:
   github_token:
-    required: true
     description: GITHUB_TOKEN to use GitHub API. Simply specify secrets.GITHUB_TOKEN.
-  ref:
-    description: Branch/Commit/Tag to use
-    type: string
-  stack:
-    description: Full name of the CDKTF stack to diff.
-    type: string
+    required: true
   job_name:
     description: jobs.<job-id>.name of this workflow job. This is needed to get the job ID via query.
     required: true
+  output_filename:
+    description: Name of the file this jobs outputs will be saved into.
+    required: true
+  ref:
+    description: The ref (branch or sha) to use with the diff.
+    required: true
+  stack:
+    description: Full name of the CDKTF stack to diff.
+    required: true
+  stub_output_file:
+    description: When present, no Terraform will execute. The output of this action will be substituted with the output contained in this file. This is useful for cases when you want to test but don't have authentication set up.
   terraform_version:
     default: 1.8.0
     description: The version of Terraform to use
   working_directory:
     default: ./
     description: Working directory path that contains your cdktf code.
-  output_filename:
-    description: Name of the file this jobs outputs will be saved into.
-    required: true
-  stub_output_file:
-    description: When present, no Terraform will execute. The output of this action will be substituted with the output contained in this file. This is useful for cases when you want to test but don't have authentication set up.
-    required: false
 outputs:
-  result_code:
-    description: Similar to exitcode behavior for Terraform, not yet supported by CDKTF.  0 = Succeeded with empty diff (no changes), 1 = Error, 2 = Succeeded with non-empty diff (changes present)
-    value: ${{ steps.diff.outputs.result_code }}
-  summary:
-    description: Single string of output to summarize the results.
-    value: ${{ steps.diff.outputs.summary }}
   html_url:
     description: Direct link to this job, which shows the full execution output.
     value: ${{ steps.jobid_action.outputs.html_url }}
-  stack:
-    description: Full name of the CDKTF stack used for the diff.
-    value: ${{ inputs.stack }}
   job_id:
     description: ID of this job
     value: ${{ steps.jobid_action.outputs.job_id }}
+  result_code:
+    description: Similar to exitcode behavior for Terraform, not yet supported by CDKTF.  0 = Succeeded with empty diff (no changes), 1 = Error, 2 = Succeeded with non-empty diff (changes present)
+    value: ${{ steps.diff.outputs.result_code }}
+  stack:
+    description: Full name of the CDKTF stack used for the diff.
+    value: ${{ inputs.stack }}
+  summary:
+    description: Single string of output to summarize the results.
+    value: ${{ steps.diff.outputs.summary }}
 runs:
   using: composite
   steps:
