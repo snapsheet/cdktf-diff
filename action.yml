@@ -22,6 +22,9 @@ inputs:
   output_filename:
     description: Name of the file this jobs outputs will be saved into.
     required: true
+  stub_output_file:
+    description: When present, no Terraform will execute. The output of this action will be substituted with the output contained in this file. This is useful for cases when you want to test but don't have authentication set up.
+    required: false
 outputs:
   result_code:
     description: Similar to exitcode behavior for Terraform, not yet supported by CDKTF.  0 = Succeeded with empty diff (no changes), 1 = Error, 2 = Succeeded with non-empty diff (changes present)
@@ -80,9 +83,21 @@ runs:
       run: |
         cd ${{ inputs.working_directory }}
 
+        # If stub_output_file is present, set the execution command to output this file instead of running diff.
+        # Assignment uses single quotes explicitly to prevent possible code injection.
+        if [ -f "${{ inputs.stub_output_file }}" ]; then
+          DIFF_COMMAND='cat ${{ inputs.stub_output_file }} | perl -pe \'select undef,undef,undef,.05\''
+        else
+          DIFF_COMMAND='CI=1 npx cdktf diff ${{ inputs.stack }}'
+        fi
+
         # show output in CLI/GitHub and also send to file for later parsing
         DIFF_FILE_PATH="${TMPDIR}cdktf-diff.txt"
-        CI=1 npx cdktf diff ${{ inputs.stack }} | tee $DIFF_FILE_PATH
+        eval $DIFF_COMMAND | tee $DIFF_FILE_PATH
+
+        ### NOT AN ACTUAL USE CASE; ONLY FOR TESTING ###
+        ### Simulate console output at a specific rate to STDOUT, while also being saved to $DIFF_FILE_PATH
+         | tee $DIFF_FILE_PATH
 
         # If planning failed due to an error, set the outputs and return.
         if cat $DIFF_FILE_PATH | sed -r "s/\\x1B\\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" | grep "Planning failed. Terraform encountered an error while generating this plan." > /dev/null ; then
