@@ -86,7 +86,7 @@ runs:
         # If stub_output_file is present, set the execution command to output this file instead of running diff.
         # Assignment uses single quotes explicitly to prevent possible code injection.
         if [ -f "${{ inputs.stub_output_file }}" ]; then
-          DIFF_COMMAND='cat ${{ inputs.stub_output_file }} | perl -pe \'select undef,undef,undef,.05\''
+          DIFF_COMMAND='cat ${{ inputs.stub_output_file }} | perl -pe "select undef,undef,undef,.05"'
         else
           DIFF_COMMAND='CI=1 npx cdktf diff ${{ inputs.stack }}'
         fi
