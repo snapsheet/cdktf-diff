@@ -48,6 +48,7 @@ runs:
       with:
         github_token: ${{ inputs.GITHUB_TOKEN }}
         job_name: ${{ inputs.job_name }}
+        per_page: 100
 
     - uses: hashicorp/setup-terraform@v3
       with:
