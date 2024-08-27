@@ -104,7 +104,7 @@ runs:
         fi
 
         # If skip_synth is set to true, add --skip-synth to the command options.
-        if [ -f "${{ inputs.skip_synth }}" == "true" ]; then
+        if [ "${{ inputs.skip_synth }}" == "true" ]; then
           DIFF_COMMAND= "$DIFF_COMMAND --skip-synth"
         fi
 
