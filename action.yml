@@ -105,10 +105,10 @@ runs:
 
         # If skip_synth is set to true, add --skip-synth to the command options.
         if [ "${{ inputs.skip_synth }}" == "true" ]; then
-          DIFF_COMMAND= "$DIFF_COMMAND --skip-synth"
+          DIFF_COMMAND="$DIFF_COMMAND --skip-synth"
         fi
 
-        DIFF_COMMAND= "$DIFF_COMMAND ${{ inputs.stack }}"
+        DIFF_COMMAND="$DIFF_COMMAND ${{ inputs.stack }}"
 
         # show output in CLI/GitHub and also send to file for later parsing
         DIFF_FILE_PATH="${TMPDIR}cdktf-diff.txt"
