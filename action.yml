@@ -111,10 +111,10 @@ runs:
         DIFF_COMMAND="$DIFF_COMMAND ${{ inputs.stack }}"
 
         echo "PWD"
-        ls -lah ./
+        ls -lah ${{ inputs.working_directory }}
 
         echo "CDKTF DIR"
-        ls -lah ./cdktf/
+        ls -lah ${{ inputs.working_directory }}/cdktf
 
         # show output in CLI/GitHub and also send to file for later parsing
         DIFF_FILE_PATH="${TMPDIR}cdktf-diff.txt"
