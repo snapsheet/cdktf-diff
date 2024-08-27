@@ -110,6 +110,12 @@ runs:
 
         DIFF_COMMAND="$DIFF_COMMAND ${{ inputs.stack }}"
 
+        echo "PWD"
+        ls -lah ./
+
+        echo "CDKTF DIR"
+        ls -lah ./cdktf/
+
         # show output in CLI/GitHub and also send to file for later parsing
         DIFF_FILE_PATH="${TMPDIR}cdktf-diff.txt"
         eval $DIFF_COMMAND | tee $DIFF_FILE_PATH
