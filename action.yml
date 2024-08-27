@@ -87,7 +87,7 @@ runs:
       uses: actions/download-artifact@v4
       with:
         name: ${{ inputs.artifact_name }}
-        path: ${{ inputs.working_directory }}
+        path: ${{ inputs.working_directory }}/someplace
 
     - name: Run Diff
       id: diff
@@ -111,10 +111,7 @@ runs:
         DIFF_COMMAND="$DIFF_COMMAND ${{ inputs.stack }}"
 
         echo "PWD"
-        ls -lah ${{ inputs.working_directory }}
-
-        echo "CDKTF DIR"
-        ls -lah ${{ inputs.working_directory }}/cdktf
+        ls -lah
 
         # show output in CLI/GitHub and also send to file for later parsing
         DIFF_FILE_PATH="${TMPDIR}cdktf-diff.txt"
