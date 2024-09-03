@@ -24,6 +24,11 @@ inputs:
   working_directory:
     default: ./
     description: Working directory path that contains your cdktf code.
+  skip_synth:
+    default: false
+    description: Skip synthesis of the application, assume the synthesized Terraform code is already present and up to date
+  artifact_name:
+    description: When given, attempt to download the given artifact contents into this working directory.
 outputs:
   html_url:
     description: Direct link to this job, which shows the full execution output.
@@ -77,6 +82,13 @@ runs:
         cd ${{ inputs.working_directory }}
         npm ci
 
+    - name: Download Artifact Files
+      if: ${{ inputs.artifact_name }}
+      uses: actions/download-artifact@v4
+      with:
+        name: ${{ inputs.artifact_name }}
+        path: ${{ inputs.working_directory }}/cdktf.out
+
     - name: Run Diff
       id: diff
       shell: bash
@@ -88,8 +100,15 @@ runs:
         if [ -f "${{ inputs.stub_output_file }}" ]; then
           DIFF_COMMAND='cat ${{ inputs.stub_output_file }} | perl -pe "select undef,undef,undef,.05"'
         else
-          DIFF_COMMAND='CI=1 npx cdktf diff ${{ inputs.stack }}'
+          DIFF_COMMAND='CI=1 npx cdktf diff'
         fi
+
+        # If skip_synth is set to true, add --skip-synth to the command options.
+        if [ "${{ inputs.skip_synth }}" == "true" ]; then
+          DIFF_COMMAND="$DIFF_COMMAND --skip-synth"
+        fi
+
+        DIFF_COMMAND="$DIFF_COMMAND ${{ inputs.stack }}"
 
         # show output in CLI/GitHub and also send to file for later parsing
         DIFF_FILE_PATH="${TMPDIR}cdktf-diff.txt"
