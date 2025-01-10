@@ -61,28 +61,29 @@ runs:
 
         while [ -z "$found_job_id" ]; do
           echo "Fetching page $page of jobs."
-          response=$(curl -s -H "Accept: application/vnd.github.v3+json" \
-                          -H "Authorization: Bearer $GITHUB_TOKEN" \
-                          "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?per_page=100&page=${page}")
+          # Get both the response body and Link header in one request
+          response=$(curl -s -D - -H "Accept: application/vnd.github.v3+json" \
+                        -H "Authorization: Bearer $GITHUB_TOKEN" \
+                        "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?per_page=100&page=${page}")
+          
 
-          # Use jq to find the job ID for the matching name.
-          found_job_id=$(echo "$response" | jq -r --arg jobName "$JOB_NAME" '.jobs[] | select(.name == $jobName) | .id')
+          
+          # Extract the JSON body everything after the blank line after headers.
+          json_response=$(echo "$response" | awk -v RS='\r\n\r\n' 'END{print}')
+          
+          # Use jq to find the job ID for the matching name
+          found_job_id=$(echo "$json_response" | jq -r --arg jobName "$JOB_NAME" '.jobs[] | select(.name == $jobName) | .id')
           if [ -n "$found_job_id" ] && [ "$found_job_id" != "null" ]; then
-            # If found, also grab the html_url.
-            found_html_url=$(echo "$response" | jq -r --arg jobName "$JOB_NAME" '.jobs[] | select(.name == $jobName) | .html_url')
-
+            # If found, also grab the html_url
+            found_html_url=$(echo "$json_response" | jq -r --arg jobName "$JOB_NAME" '.jobs[] | select(.name == $jobName) | .html_url')
+            
             echo "Found job with name: $JOB_NAME, ID: $found_job_id"
             echo "job_id=$found_job_id" >> $GITHUB_OUTPUT
             echo "html_url=$found_html_url" >> $GITHUB_OUTPUT
             break
           fi
-
-          # If there's no 'next' link in the headers. We've reached the end.
-          link_header=$(curl -sI -H "Accept: application/vnd.github.v3+json" \
-                              -H "Authorization: Bearer $GITHUB_TOKEN" \
-                              "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?per_page=100&page=${page}" \
-                        | grep -i ^Link: || true)
-
+          # Extract the Link header and check If there's no 'next' link in the headers. We've reached the end.
+          link_header=$(echo "$response" | grep -i ^Link: || true)
           if [[ "$link_header" != *'rel="next"'* ]]; then
             echo "Could not find the job with name $JOB_NAME after paginating."
             exit 1
