@@ -82,8 +82,8 @@ runs:
             echo "html_url=$found_html_url" >> $GITHUB_OUTPUT
             break
           fi
-          # Extract the Link header and check If there's no 'next' link in the headers. We've reached the end.
           link_header=$(echo "$response" | grep -i ^Link: || true)
+          # Extract the Link header and check If there's no 'next' link in the headers. We've reached the end.
           if [[ "$link_header" != *'rel="next"'* ]]; then
             echo "Could not find the job with name $JOB_NAME after paginating."
             exit 1
