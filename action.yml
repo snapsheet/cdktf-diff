@@ -58,14 +58,14 @@ runs:
         # We'll fetch pages of jobs and look for the one that matches JOB_NAME.
         found_job_id=''
         page=1
-        curl -f -s -D - -H "Accept: application/vnd.github.v3+json" \
+        curl --fail-with-body -s -D - -H "Accept: application/vnd.github.v3+json" \
             -H "Authorization: Bearer invalid_token" \
             "https://api.github.com/repos/snapsheet/cdktf-diff/actions/runs/1234/jobs"
 
         while [ -z "$found_job_id" ]; do
           echo "Fetching page $page of jobs."
           # Get both the response body and Link header in one request
-          response=$(curl -f -s -D - -H "Accept: application/vnd.github.v3+json" \
+          response=$(curl --fail-with-body -s -D - -H "Accept: application/vnd.github.v3+json" \
                         -H "Authorization: Bearer $GITHUB_TOKEN" \
                         "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?per_page=100&page=${page}")
           
