@@ -69,7 +69,7 @@ runs:
           # Extract the JSON body everything after the blank line after headers.
           json_response=$(echo "$response" | awk -v RS='\r\n\r\n' 'END{print}')
           
-          # Use jq to find the job ID for the matching name
+          # Use jq to try to find the job ID for the matching name
           found_job_id=$(echo "$json_response" | jq -r --arg jobName "$JOB_NAME" '.jobs[] | select(.name == $jobName) | .id')
           if [ -n "$found_job_id" ] && [ "$found_job_id" != "null" ]; then
             # If found, also grab the html_url
