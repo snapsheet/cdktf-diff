@@ -1,4 +1,4 @@
-# CDKTF Synth
+# CDKTF Diff
 
 Execute `cdktf diff`, parse STDOUT/STDERR output, and return outputs based on the outcomes.
 
