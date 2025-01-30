@@ -187,7 +187,7 @@ async function runDiff(inputs: ActionInputs): Promise<{ resultCode: ActionOutput
  * @returns Promise<void>
  * @throws Error if any critical step fails
  */
-export async function run(): Promise<void> {
+export default async function run(): Promise<void> {
   try {
     // Get and validate inputs
     const inputs = await getInputs();
@@ -225,7 +225,4 @@ export async function run(): Promise<void> {
   }
 }
 
-// Execute the action if this is the main module
-if (require.main === module) {
-  run();
-} 
+run();
