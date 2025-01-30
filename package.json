@@ -4,10 +4,9 @@
   "description": "GitHub Action to execute cdktf diff and parse outputs",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc",
-    "test": "jest --coverage",
-    "lint": "eslint src/**/*.ts",
-    "prepare": "npm run build",
+    "build": "npx ncc build src/index.ts -o dist --source-map",
+    "test": "npx jest --coverage",
+    "lint": "npx eslint src/*",
     "dist-branch": "./create_dist.sh"
   },
   "dependencies": {
