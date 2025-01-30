@@ -7,11 +7,11 @@
  * @packageDocumentation
  */
 
-import * as core from '@actions/core';
-import * as github from '@actions/github';
-import * as exec from '@actions/exec';
-import * as fs from 'fs';
-import * as path from 'path';
+import * as core from "@actions/core";
+import * as github from "@actions/github";
+import * as exec from "@actions/exec";
+import * as fs from "fs";
+import * as path from "path";
 
 /**
  * Interface representing all possible inputs for the action.
@@ -55,7 +55,7 @@ interface ActionOutputs {
    * - '1': Error occurred
    * - '2': Success with changes detected
    */
-  resultCode: '0' | '1' | '2';
+  resultCode: "0" | "1" | "2";
   /** Name of the CDKTF stack used */
   stack: string;
   /** Human-readable summary of changes */
@@ -71,16 +71,16 @@ interface ActionOutputs {
  */
 export async function getInputs(): Promise<ActionInputs> {
   return {
-    githubToken: core.getInput('github_token', { required: true }),
-    jobName: core.getInput('job_name', { required: true }),
-    outputFilename: core.getInput('output_filename', { required: true }),
-    ref: core.getInput('ref', { required: true }),
-    stack: core.getInput('stack', { required: true }),
-    stubOutputFile: core.getInput('stub_output_file'),
-    terraformVersion: core.getInput('terraform_version') || '1.8.0',
-    workingDirectory: core.getInput('working_directory') || './',
-    skipSynth: core.getInput('skip_synth') === 'true',
-    artifactName: core.getInput('artifact_name')
+    githubToken: core.getInput("github_token", { required: true }),
+    jobName: core.getInput("job_name", { required: true }),
+    outputFilename: core.getInput("output_filename", { required: true }),
+    ref: core.getInput("ref", { required: true }),
+    stack: core.getInput("stack", { required: true }),
+    stubOutputFile: core.getInput("stub_output_file"),
+    terraformVersion: core.getInput("terraform_version") || "1.8.0",
+    workingDirectory: core.getInput("working_directory") || "./",
+    skipSynth: core.getInput("skip_synth") === "true",
+    artifactName: core.getInput("artifact_name")
   };
 }
 
@@ -97,6 +97,7 @@ async function getJobId(token: string, jobName: string): Promise<{ jobId: string
   const octokit = github.getOctokit(token);
   let page = 1;
   
+  // eslint-disable-next-line no-constant-condition
   while (true) {
     const response = await octokit.rest.actions.listJobsForWorkflowRun({
       ...github.context.repo,
@@ -129,19 +130,19 @@ async function getJobId(token: string, jobName: string): Promise<{ jobId: string
  * @returns Promise containing result code and summary
  * @throws Error if the diff execution fails unexpectedly
  */
-async function runDiff(inputs: ActionInputs): Promise<{ resultCode: ActionOutputs['resultCode']; summary: string }> {
-  const outputPath = path.join(process.env.TMPDIR || '/tmp', 'cdktf-diff.txt');
+async function runDiff(inputs: ActionInputs): Promise<{ resultCode: ActionOutputs["resultCode"]; summary: string }> {
+  const outputPath = path.join(process.env.TMPDIR || "/tmp", "cdktf-diff.txt");
   let diffCommand = inputs.stubOutputFile ? 
     `cat ${inputs.stubOutputFile}` :
-    'CI=1 npx cdktf diff';
+    "CI=1 npx cdktf diff";
 
   if (inputs.skipSynth) {
-    diffCommand += ' --skip-synth';
+    diffCommand += " --skip-synth";
   }
   diffCommand += ` ${inputs.stack}`;
 
   try {
-    let output = '';
+    let output = "";
     await exec.exec(diffCommand, [], {
       listeners: {
         stdout: (data) => {
@@ -155,26 +156,27 @@ async function runDiff(inputs: ActionInputs): Promise<{ resultCode: ActionOutput
 
     // Write output to file for parsing
     fs.writeFileSync(outputPath, output);
-    const cleanOutput = output.replace(/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]/g, '');
+    // eslint-disable-next-line no-control-regex
+    const cleanOutput = output.replace(/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]/g, "");
 
     // Check for various output patterns and determine result
-    if (cleanOutput.includes('Planning failed. Terraform encountered an error')) {
-      const summary = cleanOutput.match(/Error: .*/)?.[0] || 'Unknown error occurred';
-      return { resultCode: '1', summary };
+    if (cleanOutput.includes("Planning failed. Terraform encountered an error")) {
+      const summary = cleanOutput.match(/Error: .*/)?.[0] || "Unknown error occurred";
+      return { resultCode: "1", summary };
     }
 
-    if (cleanOutput.includes('No changes. Your infrastructure matches the configuration.')) {
-      return { resultCode: '0', summary: 'No changes. Your infrastructure matches the configuration.' };
+    if (cleanOutput.includes("No changes. Your infrastructure matches the configuration.")) {
+      return { resultCode: "0", summary: "No changes. Your infrastructure matches the configuration." };
     }
 
     const planMatch = cleanOutput.match(/Plan:.*/);
     if (planMatch) {
-      return { resultCode: '2', summary: planMatch[0] };
+      return { resultCode: "2", summary: planMatch[0] };
     }
 
-    throw new Error('Could not determine if diff ran successfully');
-  } catch (error: any) {
-    return { resultCode: '1', summary: error.message };
+    throw new Error("Could not determine if diff ran successfully");
+  } catch (error) {
+    return { resultCode: "1", summary: (error as Error).message };
   }
 }
 
@@ -214,8 +216,12 @@ export async function run(): Promise<void> {
     const outputPath = path.join(inputs.workingDirectory, inputs.outputFilename);
     fs.writeFileSync(outputPath, JSON.stringify(outputs));
 
-  } catch (error:any) {
-    core.setFailed(error.message);
+  } catch (error) {
+    if (error instanceof Error) {
+      core.setFailed(error.message);
+    } else {
+      core.setFailed(String(error));
+    }
   }
 }
 
