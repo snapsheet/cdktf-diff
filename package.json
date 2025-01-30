@@ -1,8 +1,15 @@
 {
   "name": "cdktf-diff-action",
-  "version": "1.0.0",
+  "version": "0.1.0",
+  "author": "@snapsheet",
+  "private": true,
   "description": "GitHub Action to execute cdktf diff and parse outputs",
-  "main": "dist/index.js",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "build": "tsc",
     "test": "npx jest --coverage",
