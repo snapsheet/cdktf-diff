@@ -134,7 +134,7 @@ async function runDiff(inputs: ActionInputs): Promise<{ resultCode: ActionOutput
   const outputPath = path.join(process.env.TMPDIR || "/tmp", "cdktf-diff.txt");
   let diffCommand = inputs.stubOutputFile ? 
     `cat ${inputs.stubOutputFile}` :
-    "CI=1 npx cdktf diff";
+    `cd ${inputs.workingDirectory}; CI=1 npx cdktf diff`;
 
   if (inputs.skipSynth) {
     diffCommand += " --skip-synth";
@@ -146,10 +146,10 @@ async function runDiff(inputs: ActionInputs): Promise<{ resultCode: ActionOutput
     let output = "";
     await exec.exec(diffCommand, [], {
       listeners: {
-        stdout: (data) => {
+        stdout: (data: Buffer) => {
           output += data.toString();
         },
-        stderr: (data) => {
+        stderr: (data: Buffer) => {
           output += data.toString();
         }
       }
