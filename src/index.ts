@@ -223,6 +223,8 @@ async function runDiff(inputs: ActionInputs): Promise<{ resultCode: ActionOutput
   }
   diffCommand += ` ${inputs.stack}`;
 
+  console.log(`Current working directory: ${process.cwd()}`);
+  console.log(`ls of current directory: ${await exec.exec("ls", [], { cwd: process.cwd() })}`);
   console.log(`Diff command before exec: ${diffCommand}`);
   try {
     let output = "";
