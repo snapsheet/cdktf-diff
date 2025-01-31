@@ -226,7 +226,7 @@ async function runDiff(inputs: ActionInputs): Promise<{ resultCode: ActionOutput
   console.log(`Diff command before exec: ${diffCommand}`);
   try {
     let output = "";
-    await exec.exec(diffCommand, [], {
+    await exec.exec("bash", ["-c", diffCommand], {
       listeners: {
         stdout: (data: Buffer) => {
           output += data.toString();
