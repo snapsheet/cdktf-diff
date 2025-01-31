@@ -272,15 +272,15 @@ export default async function run(): Promise<void> {
     // Get job information
     const { jobId, htmlUrl } = await getJobId(inputs.githubToken, inputs.jobName);
 
-    // Download artifacts if specified
-    await downloadArtifact(inputs.artifactName, inputs.workingDirectory);
-    
     // Checkout repository
     // await checkoutRepo(inputs.ref);
     
     // // Setup required tools
     await setupTerraform(inputs.terraformVersion);
     await setupNodeEnvironment(inputs.workingDirectory);
+
+    // Download artifacts if specified
+    await downloadArtifact(inputs.artifactName, inputs.workingDirectory);
     
     // Run the diff
     const { resultCode, summary } = await runDiff(inputs);
