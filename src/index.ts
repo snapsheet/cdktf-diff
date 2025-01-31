@@ -181,30 +181,6 @@ async function setupNodeEnvironment(workingDirectory: string): Promise<void> {
 }
 
 /**
- * Checks out the repository at the specified ref
- * 
- * @param ref - Git ref to checkout
- */
-async function checkoutRepo(ref: string): Promise<void> {
-  console.log(`Checking out ref: ${ref}`);
-  
-  // Configure git
-  await exec.exec("git", ["config", "--global", "user.email", "github-actions[bot]@users.noreply.github.com"]);
-  await exec.exec("git", ["config", "--global", "user.name", "github-actions[bot]"]);
-  
-  // Clean any existing git state
-  await exec.exec("git", ["clean", "-ffdx"]);
-  await exec.exec("git", ["reset", "--hard"]);
-  
-  // Fetch and checkout
-  await exec.exec("git", ["fetch", "--no-tags", "--prune", "--depth=1", "origin", ref]);
-  await exec.exec("git", ["checkout", "--progress", "--force", ref]);
-  
-  // Show current commit for logging
-  await exec.exec("git", ["log", "-1"]);
-}
-
-/**
  * Executes the CDKTF diff command and processes its output.
  * Supports both real execution and test mode with stub output.
  * 
@@ -265,6 +241,21 @@ async function runDiff(inputs: ActionInputs): Promise<{ resultCode: ActionOutput
 }
 
 /**
+ * Downloads artifact files if specified
+ * 
+ * @param artifactName - Name of the artifact to download
+ * @param workingDirectory - Directory to download to
+ */
+async function downloadArtifact(artifactName: string | undefined, workingDirectory: string): Promise<void> {
+  if (!artifactName) {
+    return;
+  }
+
+  console.log(`Downloading artifact: ${artifactName}`);
+  await exec.exec("gh", ["artifact", "download", artifactName, "--dir", workingDirectory]);
+}
+
+/**
  * Main entry point for the action.
  * Orchestrates the entire diff process and handles outputs.
  * 
@@ -279,6 +270,9 @@ export default async function run(): Promise<void> {
     // Get job information
     const { jobId, htmlUrl } = await getJobId(inputs.githubToken, inputs.jobName);
 
+    // Download artifacts if specified
+    await downloadArtifact(inputs.artifactName, inputs.workingDirectory);
+    
     // Checkout repository
     // await checkoutRepo(inputs.ref);
     
