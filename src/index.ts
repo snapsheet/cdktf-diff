@@ -12,6 +12,7 @@ import * as github from "@actions/github";
 import * as exec from "@actions/exec";
 import * as fs from "fs";
 import * as path from "path";
+import * as io from "@actions/io";
 
 /**
  * Interface representing all possible inputs for the action.
@@ -123,6 +124,60 @@ async function getJobId(token: string, jobName: string): Promise<{ jobId: string
 }
 
 /**
+ * Sets up Terraform with the specified version
+ * 
+ * @param version - Terraform version to install
+ */
+async function setupTerraform(version: string): Promise<void> {
+  // Using the setup-terraform action's functionality via CLI
+  await exec.exec("curl", [
+    "-o", "terraform.zip",
+    `https://releases.hashicorp.com/terraform/${version}/terraform_${version}_linux_amd64.zip`
+  ]);
+  await exec.exec("unzip", ["terraform.zip"]);
+  await io.mv("terraform", "/usr/local/bin/terraform");
+  await exec.exec("terraform", ["version"]);
+
+  console.log(`Setting up Terraform version ${version}...`);
+  console.log("Terraform setup complete");
+}
+
+/**
+ * Sets up Node.js environment and installs dependencies
+ * 
+ * @param workingDirectory - Directory containing package.json
+ */
+async function setupNodeEnvironment(workingDirectory: string): Promise<void> {
+  // Read .nvmrc file to get Node version
+  const nvmrcPath = path.join(workingDirectory, ".nvmrc");
+  let nodeVersion: string;
+  
+  try {
+    nodeVersion = fs.readFileSync(nvmrcPath, "utf8").trim();
+  } catch (error) {
+    throw new Error("Failed to read .nvmrc file. Make sure it exists in your working directory.");
+  }
+
+  // Setup Node.js with the specified version
+  const setupScript = `
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+    export NVM_DIR="$HOME/.nvm"
+    [ -s "$NVM_DIR/nvm.sh" ] && \\. "$NVM_DIR/nvm.sh"
+    nvm install ${nodeVersion}
+    nvm use ${nodeVersion}
+  `;
+  
+  await exec.exec("bash", ["-c", setupScript]);
+
+  // Install dependencies
+  await exec.exec("npm", ["ci"], { cwd: workingDirectory });
+
+  console.log(`Setting up Node.js environment in ${workingDirectory}...`);
+  console.log(`Using Node.js version from .nvmrc: ${nodeVersion}`);
+  console.log("Node.js environment setup complete");
+}
+
+/**
  * Executes the CDKTF diff command and processes its output.
  * Supports both real execution and test mode with stub output.
  * 
@@ -195,6 +250,10 @@ export default async function run(): Promise<void> {
     
     // Get job information
     const { jobId, htmlUrl } = await getJobId(inputs.githubToken, inputs.jobName);
+    
+    // Setup required tools
+    await setupTerraform(inputs.terraformVersion);
+    await setupNodeEnvironment(inputs.workingDirectory);
     
     // Run the diff
     const { resultCode, summary } = await runDiff(inputs);
