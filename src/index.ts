@@ -13,6 +13,7 @@ import * as exec from "@actions/exec";
 import * as fs from "fs";
 import * as path from "path";
 import * as io from "@actions/io";
+import { DefaultArtifactClient } from "@actions/artifact";
 
 /**
  * Interface representing all possible inputs for the action.
@@ -38,7 +39,7 @@ interface ActionInputs {
   /** Whether to skip synthesis step */
   skipSynth: boolean;
   /** Optional artifact to download */
-  artifactName?: string;
+  artifactName?: number;
 }
 
 /**
@@ -81,7 +82,7 @@ export async function getInputs(): Promise<ActionInputs> {
     terraformVersion: core.getInput("terraform_version") || "1.8.0",
     workingDirectory: core.getInput("working_directory") || "./",
     skipSynth: core.getInput("skip_synth") === "true",
-    artifactName: core.getInput("artifact_name")
+    artifactName: core.getInput("artifact_name") ? parseInt(core.getInput("artifact_name")) : undefined
   };
 }
 
@@ -246,13 +247,14 @@ async function runDiff(inputs: ActionInputs): Promise<{ resultCode: ActionOutput
  * @param artifactName - Name of the artifact to download
  * @param workingDirectory - Directory to download to
  */
-async function downloadArtifact(artifactName: string | undefined, workingDirectory: string): Promise<void> {
+async function downloadArtifact(artifactName: number | undefined, workingDirectory: string): Promise<void> {
   if (!artifactName) {
     return;
   }
 
+  const artifact = new DefaultArtifactClient();
   console.log(`Downloading artifact: ${artifactName}`);
-  await exec.exec("gh", ["artifact", "download", artifactName, "--dir", workingDirectory]);
+  await artifact.downloadArtifact(artifactName, { path: workingDirectory });
 }
 
 /**
