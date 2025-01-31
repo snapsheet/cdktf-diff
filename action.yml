@@ -84,6 +84,7 @@ runs:
         path: ${{ inputs.working_directory }}/cdktf.out
     - name: Run Diff
       uses: ./
+      using: node20
       with:
         github_token: ${{ inputs.github_token }}
         job_name: ${{ inputs.job_name }}
