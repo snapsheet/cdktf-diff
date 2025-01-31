@@ -186,12 +186,12 @@ async function setupNodeEnvironment(workingDirectory: string): Promise<void> {
  * @param ref - Git ref to checkout
  * @param workingDirectory - Directory to checkout into
  */
-async function checkoutRepo(ref: string, workingDirectory: string): Promise<void> {
+async function checkoutRepo(ref: string): Promise<void> {
   console.log(`Checking out ref: ${ref}`);
   
-  await exec.exec("git", ["fetch", "--depth=1", "origin", ref], { cwd: workingDirectory });
-  await exec.exec("git", ["checkout", ref], { cwd: workingDirectory });
-  await exec.exec("git", ["log", "-1"], { cwd: workingDirectory }); // Show current commit
+  await exec.exec("git", ["fetch", "--depth=1", "origin", ref]);
+  await exec.exec("git", ["checkout", ref]);
+  await exec.exec("git", ["log", "-1"]); // Show current commit
 }
 
 /**
@@ -269,7 +269,7 @@ export default async function run(): Promise<void> {
     const { jobId, htmlUrl } = await getJobId(inputs.githubToken, inputs.jobName);
     
     // Checkout repository
-    await checkoutRepo(inputs.ref, inputs.workingDirectory);
+    await checkoutRepo(inputs.ref);
     
     // Setup required tools
     await setupTerraform(inputs.terraformVersion);
