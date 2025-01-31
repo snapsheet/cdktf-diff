@@ -141,6 +141,7 @@ async function runDiff(inputs: ActionInputs): Promise<{ resultCode: ActionOutput
   }
   diffCommand += ` ${inputs.stack}`;
 
+  console.log(`Diff command before exec: ${diffCommand}`);
   try {
     let output = "";
     await exec.exec(diffCommand, [], {
