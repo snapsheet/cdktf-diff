@@ -167,7 +167,7 @@ async function setupNodeEnvironment(workingDirectory: string): Promise<void> {
     nvm use ${nodeVersion}
   `;
   
-  await exec.exec("bash", ["-c", setupScript]);
+  await exec.exec("bash", ["-c", setupScript], { cwd: workingDirectory });
 
   // Install dependencies
   await exec.exec("npm", ["ci"], { cwd: workingDirectory });
