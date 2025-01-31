@@ -181,6 +181,20 @@ async function setupNodeEnvironment(workingDirectory: string): Promise<void> {
 }
 
 /**
+ * Checks out the repository at the specified ref
+ * 
+ * @param ref - Git ref to checkout
+ * @param workingDirectory - Directory to checkout into
+ */
+async function checkoutRepo(ref: string, workingDirectory: string): Promise<void> {
+  console.log(`Checking out ref: ${ref}`);
+  
+  await exec.exec("git", ["fetch", "--depth=1", "origin", ref], { cwd: workingDirectory });
+  await exec.exec("git", ["checkout", ref], { cwd: workingDirectory });
+  await exec.exec("git", ["log", "-1"], { cwd: workingDirectory }); // Show current commit
+}
+
+/**
  * Executes the CDKTF diff command and processes its output.
  * Supports both real execution and test mode with stub output.
  * 
@@ -253,6 +267,9 @@ export default async function run(): Promise<void> {
     
     // Get job information
     const { jobId, htmlUrl } = await getJobId(inputs.githubToken, inputs.jobName);
+    
+    // Checkout repository
+    await checkoutRepo(inputs.ref, inputs.workingDirectory);
     
     // Setup required tools
     await setupTerraform(inputs.terraformVersion);
