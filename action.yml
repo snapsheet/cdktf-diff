@@ -83,5 +83,12 @@ runs:
         name: ${{ inputs.artifact_name }}
         path: ${{ inputs.working_directory }}/cdktf.out
     - name: Run Diff
-      using: node20
-      main: dist/index.js
+      uses: dist/index.js
+      with:
+        github_token: ${{ inputs.github_token }}
+        job_name: ${{ inputs.job_name }}
+        output_filename: ${{ inputs.output_filename }}
+        ref: ${{ inputs.ref }}
+        stack: ${{ inputs.stack }}
+        stub_output_file: ${{ inputs.stub_output_file }}
+        terraform_version: ${{ inputs.terraform_version }}
