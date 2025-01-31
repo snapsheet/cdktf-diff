@@ -198,6 +198,8 @@ export default async function run(): Promise<void> {
     // Run the diff
     const { resultCode, summary } = await runDiff(inputs);
 
+    console.log(`Summary of diff: ${summary}`);
+
     // Prepare outputs
     const outputs: ActionOutputs = {
       htmlUrl,

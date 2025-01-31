@@ -1,4 +1,5 @@
-import { getInputs, run } from "../src";
+import getInputs from "../src";
+import run from "../src";
 import * as core from "@actions/core";
 import * as github from "@actions/github";
 import * as exec from "@actions/exec";
