@@ -153,6 +153,9 @@ async function setupNodeEnvironment(workingDirectory: string): Promise<void> {
   let nodeVersion: string;
   
   try {
+    console.log(`Check working directory: ${workingDirectory}`);
+    console.log(`ls working directory: ${await exec.exec("ls", [], { cwd: workingDirectory })}`);
+
     nodeVersion = fs.readFileSync(nvmrcPath, "utf8").trim();
   } catch (error) {
     throw new Error("Failed to read .nvmrc file. Make sure it exists in your working directory.");
