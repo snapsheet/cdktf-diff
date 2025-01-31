@@ -184,14 +184,24 @@ async function setupNodeEnvironment(workingDirectory: string): Promise<void> {
  * Checks out the repository at the specified ref
  * 
  * @param ref - Git ref to checkout
- * @param workingDirectory - Directory to checkout into
  */
 async function checkoutRepo(ref: string): Promise<void> {
   console.log(`Checking out ref: ${ref}`);
   
-  await exec.exec("git", ["fetch", "--depth=1", "origin", ref]);
-  await exec.exec("git", ["checkout", ref]);
-  await exec.exec("git", ["log", "-1"]); // Show current commit
+  // Configure git
+  await exec.exec("git", ["config", "--global", "user.email", "github-actions[bot]@users.noreply.github.com"]);
+  await exec.exec("git", ["config", "--global", "user.name", "github-actions[bot]"]);
+  
+  // Clean any existing git state
+  await exec.exec("git", ["clean", "-ffdx"]);
+  await exec.exec("git", ["reset", "--hard"]);
+  
+  // Fetch and checkout
+  await exec.exec("git", ["fetch", "--no-tags", "--prune", "--depth=1", "origin", ref]);
+  await exec.exec("git", ["checkout", "--progress", "--force", ref]);
+  
+  // Show current commit for logging
+  await exec.exec("git", ["log", "-1"]);
 }
 
 /**
