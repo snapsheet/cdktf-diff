@@ -282,8 +282,8 @@ export default async function run(): Promise<void> {
     // await checkoutRepo(inputs.ref);
     
     // // Setup required tools
-    // await setupTerraform(inputs.terraformVersion);
-    // await setupNodeEnvironment(inputs.workingDirectory);
+    await setupTerraform(inputs.terraformVersion);
+    await setupNodeEnvironment(inputs.workingDirectory);
     
     // Run the diff
     const { resultCode, summary } = await runDiff(inputs);
