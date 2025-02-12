@@ -13,7 +13,7 @@ import * as exec from "@actions/exec";
 import * as fs from "fs";
 import * as path from "path";
 import * as io from "@actions/io";
-import { DefaultArtifactClient } from "@actions/artifact";
+import * as artifact from "@actions/artifact";
 
 /**
  * Interface representing all possible inputs for the action.
@@ -252,11 +252,13 @@ async function downloadArtifact(artifactName: number | undefined, workingDirecto
     return;
   }
 
-  const artifact = new DefaultArtifactClient();
   console.log(`Downloading artifact: ${artifactName}`);
-  await artifact.downloadArtifact(artifactName, { path: workingDirectory });
+  const artifactClient = artifact.default.downloadArtifact(
+    artifactName,
+    { path: workingDirectory }
+  );
+  console.log(`Artifact client: ${artifactClient}`);
 }
-
 /**
  * Main entry point for the action.
  * Orchestrates the entire diff process and handles outputs.
