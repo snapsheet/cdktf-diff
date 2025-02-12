@@ -13,7 +13,6 @@ import * as exec from "@actions/exec";
 import * as fs from "fs";
 import * as path from "path";
 import * as io from "@actions/io";
-import { DefaultArtifactClient } from "@actions/artifact/lib/internal/artifact-client";
 
 /**
  * Interface representing all possible inputs for the action.
@@ -242,22 +241,6 @@ async function runDiff(inputs: ActionInputs): Promise<{ resultCode: ActionOutput
 }
 
 /**
- * Downloads artifact files if specified
- * 
- * @param artifactName - Name of the artifact to download
- * @param workingDirectory - Directory to download to
- */
-async function downloadArtifact(artifactName: number | undefined, workingDirectory: string): Promise<void> {
-  if (!artifactName) {
-    return;
-  }
-
-  console.log(`Downloading artifact: ${artifactName}`);
-  const artifact = new DefaultArtifactClient();
-  await artifact.downloadArtifact(artifactName.toString(), workingDirectory);
-
-}
-/**
  * Main entry point for the action.
  * Orchestrates the entire diff process and handles outputs.
  * 
@@ -276,9 +259,6 @@ export default async function run(): Promise<void> {
     await setupTerraform(inputs.terraformVersion);
     await setupNodeEnvironment(inputs.workingDirectory);
 
-    // Download artifacts if specified
-    await downloadArtifact(inputs.artifactName, inputs.workingDirectory);
-    
     // Run the diff
     const { resultCode, summary } = await runDiff(inputs);
 
