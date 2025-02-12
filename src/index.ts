@@ -13,7 +13,7 @@ import * as exec from "@actions/exec";
 import * as fs from "fs";
 import * as path from "path";
 import * as io from "@actions/io";
-import * as artifact from "@actions/artifact";
+import { DefaultArtifactClient } from "@actions/artifact/lib/internal/artifact-client";
 
 /**
  * Interface representing all possible inputs for the action.
@@ -253,11 +253,9 @@ async function downloadArtifact(artifactName: number | undefined, workingDirecto
   }
 
   console.log(`Downloading artifact: ${artifactName}`);
-  const artifactClient = artifact.default.downloadArtifact(
-    artifactName,
-    { path: workingDirectory }
-  );
-  console.log(`Artifact client: ${artifactClient}`);
+  const artifact = new DefaultArtifactClient();
+  await artifact.downloadArtifact(artifactName.toString(), workingDirectory);
+
 }
 /**
  * Main entry point for the action.
