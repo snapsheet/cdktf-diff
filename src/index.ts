@@ -250,9 +250,20 @@ async function runDiff(inputs: ActionInputs): Promise<{ resultCode: ActionOutput
 async function downloadArtifact(artifactName: number | undefined, workingDirectory: string): Promise<void> {
   if (!artifactName) return;
 
-  const artifact = new DefaultArtifactClient();
-  await artifact.downloadArtifact(artifactName, { path: workingDirectory });
+  console.log(`Downloading artifact: ${artifactName}`);
+  
+  // Download artifact using GitHub API
+  await exec.exec("curl", [
+    "-L",
+    "-H", "Accept: application/vnd.github+json",
+    "-H", `Authorization: Bearer ${process.env.GITHUB_TOKEN}`,
+    "-H", "X-GitHub-Api-Version: 2022-11-28",
+    `https://api.github.com/repos/${github.context.repo.owner}/${github.context.repo.repo}/actions/artifacts/${artifactName}/zip`
+  ]);
 
+  // Extract the artifact
+  await exec.exec("unzip", ["-o", "artifact.zip", "-d", workingDirectory]);
+  await exec.exec("rm", ["artifact.zip"]);
 }
 
 /**
