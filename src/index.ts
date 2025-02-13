@@ -254,15 +254,8 @@ async function downloadArtifact(token: string, artifactName: number | undefined,
   const octokit = github.getOctokit(token);
   
   // eslint-disable-next-line no-constant-condition
-  // const response = await octokit.rest.actions.downloadArtifact({
-  //   ...github.context.repo,
-  //   artifact_id: artifactName,
-  //   archive_format: "zip"
-  // });
-
-  const response = await octokit.request("GET /repos/{owner}/{repo}/actions/artifacts/{artifact_id}/{archive_format}", {
-    owner: github.context.repo.owner,
-    repo: github.context.repo.repo,
+  const response = await octokit.rest.actions.downloadArtifact({
+    ...github.context.repo,
     artifact_id: artifactName,
     archive_format: "zip",
     headers: {
