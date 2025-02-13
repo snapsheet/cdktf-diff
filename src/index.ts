@@ -260,22 +260,24 @@ async function downloadArtifact(token: string, jobId: number,  artifactName: num
 
   const octokit = github.getOctokit(token);
 
-  // const findBy = {
-  //   token: token,
-  //   workflowRunId: jobId,
-  //   ...github.context.repo
-  // };
+  const findBy = {
+    token: token,
+    workflowRunId: jobId,
+    ...github.context.repo
+  };
 
-  const artifactResponse = await octokit.rest.actions.getArtifact({
-    ...github.context.repo,
-    artifact_id: artifactName,
+  // List artifacts from jobID to find IDs
+  const artifactsResponse = await octokit.rest.actions.listArtifactsForRepo({
+    ...findBy,
     headers: {
       "X-GitHub-Api-Version": "2022-11-28"
     }
   });
 
-  if (!artifactResponse) {
-    throw new Error(`Artifact '${artifactName}' not found`);
+  const artifactId = artifactsResponse.data.artifacts.find(artifact => artifact.name === artifactName.toString())?.id;
+
+  if (!artifactId) {
+    throw new Error(`Could not find artifact with name ${artifactName}`);
   }
 
   // Create cdktf.out directory
@@ -287,7 +289,7 @@ async function downloadArtifact(token: string, jobId: number,  artifactName: num
     //   redirect: "manual",
     // },
     ...github.context.repo,
-    artifact_id: artifactResponse.data.id,
+    artifact_id: artifactId,
     archive_format: "zip",
     headers: {
       "X-GitHub-Api-Version": "2022-11-28"
