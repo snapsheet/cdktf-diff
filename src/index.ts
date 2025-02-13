@@ -254,14 +254,24 @@ async function downloadArtifact(token: string, artifactName: number | undefined,
   const octokit = github.getOctokit(token);
   
   // eslint-disable-next-line no-constant-condition
-  await octokit.rest.actions.downloadArtifact({
-    ...github.context.repo,
+  // const response = await octokit.rest.actions.downloadArtifact({
+  //   ...github.context.repo,
+  //   artifact_id: artifactName,
+  //   archive_format: "zip"
+  // });
+
+  const response = await octokit.request("GET /repos/{owner}/{repo}/actions/artifacts/{artifact_id}/{archive_format}", {
+    owner: github.context.repo.owner,
+    repo: github.context.repo.repo,
     artifact_id: artifactName,
-    archive_format: "zip"
+    archive_format: "zip",
+    headers: {
+      "X-GitHub-Api-Version": "2022-11-28"
+    }
   });
 
   // Extract the artifact
-  await exec.exec("unzip", ["-o", "artifact.zip", "-d", workingDirectory]);
+  await exec.exec("unzip", ["-o", response.headers.location || "artifact.zip", "-d", workingDirectory]);
   await exec.exec("rm", ["artifact.zip"]);
 }
 
