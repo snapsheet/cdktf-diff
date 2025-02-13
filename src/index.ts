@@ -280,7 +280,7 @@ async function downloadArtifact(token: string, artifactName: number | undefined,
   console.log(`Response: ${JSON.stringify(response)}`);
 
   // Extract the artifact
-  await exec.exec("unzip", ["-o", response.headers.location || "artifact.zip", "-d", workingDirectory]);
+  await exec.exec("unzip", ["-o", response.url || "artifact.zip", "-d", workingDirectory]);
   await exec.exec("rm", ["artifact.zip"]);
 }
 
