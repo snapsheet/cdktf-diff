@@ -14,6 +14,13 @@ import * as fs from "fs";
 import * as path from "path";
 import * as io from "@actions/io";
 
+export const chunk = <T>(arr: T[], n: number): T[][] =>
+  arr.reduce((acc, cur, i) => {
+    const index = Math.floor(i / n);
+    acc[index] = [...(acc[index] || []), cur];
+    return acc;
+  }, [] as T[][]);
+
 /**
  * Interface representing all possible inputs for the action.
  * These inputs are defined in action.yml and can be provided when using the action.
@@ -246,56 +253,100 @@ async function runDiff(inputs: ActionInputs): Promise<{ resultCode: ActionOutput
  * @param artifactName - Name of the artifact to download
  * @param workingDirectory - Directory to download artifacts into
  */
-async function downloadArtifact(token: string, artifactName: number | undefined, workingDirectory: string): Promise<void> {
+async function downloadArtifact(token: string, jobId: number,  artifactName: number | undefined, workingDirectory: string): Promise<void> {
   if (!artifactName) return;
 
   console.log(`Downloading artifact: ${artifactName}`);
 
   const octokit = github.getOctokit(token);
-  
-  // List artifacts to find IDs
-  const artifactsResponse = await octokit.rest.actions.listArtifactsForRepo({
+
+  // const findBy = {
+  //   token: token,
+  //   workflowRunId: jobId,
+  //   ...github.context.repo
+  // };
+
+  const artifactResponse = await octokit.rest.actions.getArtifact({
     ...github.context.repo,
+    artifact_id: artifactName,
     headers: {
       "X-GitHub-Api-Version": "2022-11-28"
     }
   });
 
-  const artifactId = artifactsResponse.data.artifacts.find(artifact => artifact.name === artifactName.toString())?.id;
-
-  if (!artifactId) {
-    throw new Error(`Could not find artifact with name ${artifactName}`);
-  }
-
-  // eslint-disable-next-line no-constant-condition
-  const response = await octokit.rest.actions.downloadArtifact({
-    request: {
-      redirect: "manual",
-    },
-    ...github.context.repo,
-    artifact_id: artifactId,
-    archive_format: "zip",
-    headers: {
-      "X-GitHub-Api-Version": "2022-11-28"
-    }
-  });
-
-  if (!response.headers.location) {
-    throw new Error("No location found in response");
+  if (!artifactResponse) {
+    throw new Error(`Artifact '${artifactName}' not found`);
   }
 
   // Create cdktf.out directory
   const cdktfOutPath = path.join(workingDirectory, "cdktf.out/");
   await io.mkdirP(cdktfOutPath);
 
-  // Download the ZIP from the redirect URL
-  await exec.exec("curl", [
-    "-L",
-    "-H", `Authorization: token ${token}`,
-    "-o", path.join(cdktfOutPath, artifactName.toString()),
-    response.headers.location
-  ]);
+  const downloadPromise = await octokit.rest.actions.downloadArtifact({
+    // request: {
+    //   redirect: "manual",
+    // },
+    ...github.context.repo,
+    artifact_id: artifactResponse.data.id,
+    archive_format: "zip",
+    headers: {
+      "X-GitHub-Api-Version": "2022-11-28"
+    },
+    path: path.join(workingDirectory, "cdktf.out/")
+  });
 
+  const chunkedPromises = chunk([downloadPromise], 5);
+  for (const chunk of chunkedPromises) {
+    await Promise.all(chunk);
+  }
+  
+
+  // // List artifacts from jobID to find IDs
+  // const artifactsResponse = await octokit.rest.actions.listArtifactsForRepo({
+  //   ...github.context.repo,
+  //   ...findBy,
+  //   headers: {
+  //     "X-GitHub-Api-Version": "2022-11-28"
+  //   }
+  // });
+
+  // const artifactId = artifactsResponse.data.artifacts.find(artifact => artifact.name === artifactName.toString())?.id;
+
+  // if (!artifactId) {
+  //   throw new Error(`Could not find artifact with name ${artifactName}`);
+  // }
+
+  // // eslint-disable-next-line no-constant-condition
+  // const response = await octokit.rest.actions.downloadArtifact({
+  //   request: {
+  //     redirect: "manual",
+  //   },
+  //   ...github.context.repo,
+  //   artifact_id: artifactId,
+  //   archive_format: "zip",
+  //   headers: {
+  //     "X-GitHub-Api-Version": "2022-11-28"
+  //   }
+  // });
+
+  // console.log(`Response: ${response}`);
+
+  // if (!response.headers.location) {
+  //   throw new Error("No location found in response");
+  // }
+
+  
+
+  // // Download the ZIP from the redirect URL
+  // const fileResult = await exec.exec("curl", [
+  //   "-L",
+  //   "-H", `Authorization: token ${token}`,
+  //   response.headers.location
+  // ], { cwd: cdktfOutPath });
+
+
+
+  // console.log(`fileResult: ${fileResult}`);
   console.log(`local directory: ${await exec.exec("ls", [], { cwd: cdktfOutPath })}`);
   // console.log(`file artifact.zip: ${await exec.exec("file artifact.zip", [], { cwd: workingDirectory })}`);
 
@@ -324,7 +375,7 @@ export default async function run(): Promise<void> {
     await setupNodeEnvironment(inputs.workingDirectory);
 
     // Download artifacts if specified
-    await downloadArtifact(inputs.githubToken,inputs.artifactName, inputs.workingDirectory);
+    await downloadArtifact(inputs.githubToken, jobId, inputs.artifactName, inputs.workingDirectory);
 
     // Run the diff
     const { resultCode, summary } = await runDiff(inputs);
