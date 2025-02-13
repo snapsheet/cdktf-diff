@@ -284,11 +284,15 @@ async function downloadArtifact(token: string, artifactName: number | undefined,
     throw new Error("No location found in response");
   }
 
+  // Create cdktf.out directory
+  const cdktfOutPath = path.join(workingDirectory, "cdktf.out");
+  await io.mkdirP(cdktfOutPath);
+
   // Download the ZIP from the redirect URL
   await exec.exec("curl", [
     "-L",
     "-H", `Authorization: token ${token}`,
-    "-o", path.join(workingDirectory, "cdktf.out"),
+    "-o", cdktfOutPath,
     response.headers.location
   ]);
 
