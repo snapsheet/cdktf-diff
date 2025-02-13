@@ -14,12 +14,6 @@ import * as fs from "fs";
 import * as path from "path";
 import * as io from "@actions/io";
 
-export const chunk = <T>(arr: T[], n: number): T[][] =>
-  arr.reduce((acc, cur, i) => {
-    const index = Math.floor(i / n);
-    acc[index] = [...(acc[index] || []), cur];
-    return acc;
-  }, [] as T[][]);
 
 /**
  * Interface representing all possible inputs for the action.
@@ -284,10 +278,10 @@ async function downloadArtifact(token: string, jobId: number,  artifactName: num
   const cdktfOutPath = path.join(workingDirectory, "cdktf.out/");
   await io.mkdirP(cdktfOutPath);
 
-  const downloadPromise = await octokit.rest.actions.downloadArtifact({
-    // request: {
-    //   redirect: "manual",
-    // },
+  const response = await octokit.rest.actions.downloadArtifact({
+    request: {
+      redirect: "manual",
+    },
     ...github.context.repo,
     artifact_id: artifactId,
     archive_format: "zip",
@@ -297,12 +291,20 @@ async function downloadArtifact(token: string, jobId: number,  artifactName: num
     path: path.join(workingDirectory, "cdktf.out/")
   });
 
-  const chunkedPromises = chunk([downloadPromise], 5);
-  for (const chunk of chunkedPromises) {
-    await Promise.all(chunk);
-  }
-  
+  console.log(`Response: ${response}`);
 
+  if (!response.headers.location) {
+    throw new Error("No location found in response");
+  }
+
+  // Download the ZIP from the redirect URL
+  const fileResult = await exec.exec("curl", [
+    "-L",
+    "-H", `Authorization: token ${token}`,
+    response.headers.location
+  ], { cwd: cdktfOutPath });
+
+  console.log(`fileResult: ${fileResult}`);
   // // List artifacts from jobID to find IDs
   // const artifactsResponse = await octokit.rest.actions.listArtifactsForRepo({
   //   ...github.context.repo,
@@ -339,12 +341,6 @@ async function downloadArtifact(token: string, jobId: number,  artifactName: num
 
   
 
-  // // Download the ZIP from the redirect URL
-  // const fileResult = await exec.exec("curl", [
-  //   "-L",
-  //   "-H", `Authorization: token ${token}`,
-  //   response.headers.location
-  // ], { cwd: cdktfOutPath });
 
 
 
