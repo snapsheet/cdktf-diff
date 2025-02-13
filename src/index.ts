@@ -13,7 +13,6 @@ import * as exec from "@actions/exec";
 import * as fs from "fs";
 import * as path from "path";
 import * as io from "@actions/io";
-import { DefaultArtifactClient } from "@actions/artifact";
 
 /**
  * Interface representing all possible inputs for the action.
@@ -247,19 +246,19 @@ async function runDiff(inputs: ActionInputs): Promise<{ resultCode: ActionOutput
  * @param artifactName - Name of the artifact to download
  * @param workingDirectory - Directory to download artifacts into
  */
-async function downloadArtifact(artifactName: number | undefined, workingDirectory: string): Promise<void> {
+async function downloadArtifact(token: string, artifactName: number | undefined, workingDirectory: string): Promise<void> {
   if (!artifactName) return;
 
   console.log(`Downloading artifact: ${artifactName}`);
+
+  const octokit = github.getOctokit(token);
   
-  // Download artifact using GitHub API
-  await exec.exec("curl", [
-    "-L",
-    "-H", "Accept: application/vnd.github+json",
-    "-H", `Authorization: Bearer ${process.env.GITHUB_TOKEN}`,
-    "-H", "X-GitHub-Api-Version: 2022-11-28",
-    `https://api.github.com/repos/${github.context.repo.owner}/${github.context.repo.repo}/actions/artifacts/${artifactName}/zip`
-  ]);
+  // eslint-disable-next-line no-constant-condition
+  await octokit.rest.actions.downloadArtifact({
+    ...github.context.repo,
+    artifact_id: artifactName,
+    archive_format: "zip"
+  });
 
   // Extract the artifact
   await exec.exec("unzip", ["-o", "artifact.zip", "-d", workingDirectory]);
@@ -286,7 +285,7 @@ export default async function run(): Promise<void> {
     await setupNodeEnvironment(inputs.workingDirectory);
 
     // Download artifacts if specified
-    await downloadArtifact(inputs.artifactName, inputs.workingDirectory);
+    await downloadArtifact(inputs.githubToken,inputs.artifactName, inputs.workingDirectory);
 
     // Run the diff
     const { resultCode, summary } = await runDiff(inputs);
