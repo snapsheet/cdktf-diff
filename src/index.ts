@@ -288,7 +288,7 @@ async function downloadArtifact(token: string, artifactName: number | undefined,
   await exec.exec("curl", [
     "-L",
     "-H", `Authorization: token ${token}`,
-    "-o", path.join(workingDirectory, "/cdktf.out"),
+    "-o", path.join(workingDirectory, "cdktf.out"),
     response.headers.location
   ]);
 
