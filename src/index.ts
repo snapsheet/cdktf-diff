@@ -39,7 +39,7 @@ interface ActionInputs {
   /** Whether to skip synthesis step */
   skipSynth: boolean;
   /** Optional artifact to download */
-  artifactName?: number;
+  artifactName?: string;
 }
 
 /**
@@ -82,7 +82,7 @@ export async function getInputs(): Promise<ActionInputs> {
     terraformVersion: core.getInput("terraform_version") || "1.8.0",
     workingDirectory: core.getInput("working_directory") || "./",
     skipSynth: core.getInput("skip_synth") === "true",
-    artifactName: core.getInput("artifact_name") ? parseInt(core.getInput("artifact_name")) : undefined
+    artifactName: core.getInput("artifact_name")
   };
 }
 
@@ -281,7 +281,7 @@ export default async function run(): Promise<void> {
     await setupNodeEnvironment(inputs.workingDirectory);
 
     // Download artifacts if specified
-    await downloadArtifact(inputs.artifactName?.toString(), inputs.workingDirectory);
+    await downloadArtifact(inputs.artifactName, inputs.workingDirectory);
 
     // Run the diff
     const { resultCode, summary } = await runDiff(inputs);
