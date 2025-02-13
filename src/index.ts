@@ -292,7 +292,7 @@ async function downloadArtifact(token: string, artifactName: number | undefined,
     response.headers.location
   ]);
 
-  // console.log(`local directory: ${await exec.exec("ls", [], { cwd: workingDirectory })}`);
+  console.log(`local directory: ${await exec.exec("ls", [], { cwd: `${workingDirectory}/cdktf.out` })}`);
   // console.log(`file artifact.zip: ${await exec.exec("file artifact.zip", [], { cwd: workingDirectory })}`);
 
   // // Extract and cleanup
