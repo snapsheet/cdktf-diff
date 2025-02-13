@@ -288,16 +288,16 @@ async function downloadArtifact(token: string, artifactName: number | undefined,
   await exec.exec("curl", [
     "-L",
     "-H", `Authorization: token ${token}`,
-    "-o", path.join(workingDirectory, "artifact.zip"),
+    "-o", path.join(workingDirectory, "/cdktf.out"),
     response.headers.location
   ]);
 
-  console.log(`local directory: ${await exec.exec("ls", [], { cwd: workingDirectory })}`);
-  console.log(`file artifact.zip: ${await exec.exec("file artifact.zip", [], { cwd: workingDirectory })}`);
+  // console.log(`local directory: ${await exec.exec("ls", [], { cwd: workingDirectory })}`);
+  // console.log(`file artifact.zip: ${await exec.exec("file artifact.zip", [], { cwd: workingDirectory })}`);
 
-  // Extract and cleanup
-  await exec.exec("unzip", ["-o", path.join(workingDirectory, "artifact.zip"), "-d", workingDirectory]);
-  await exec.exec("rm", [path.join(workingDirectory, "artifact.zip")]);
+  // // Extract and cleanup
+  // await exec.exec("unzip", ["-o", path.join(workingDirectory, "artifact.zip"), "-d", workingDirectory]);
+  // await exec.exec("rm", [path.join(workingDirectory, "artifact.zip")]);
 }
 
 /**
