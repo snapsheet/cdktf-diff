@@ -280,10 +280,20 @@ async function downloadArtifact(token: string, artifactName: number | undefined,
     }
   });
 
-  console.log(`Response: ${JSON.stringify(response)}`);
+  if (!response.headers.location) {
+    throw new Error("No location found in response");
+  }
 
-  // Extract the artifact
-  await exec.exec("unzip", ["-o", response.headers.location || "artifact.zip", "-d", workingDirectory]);
+  // Download the ZIP from the redirect URL
+  await exec.exec("curl", [
+    "-L",
+    "-H", `Authorization: token ${token}`,
+    "-o", "artifact.zip",
+    response.headers.location
+  ]);
+
+  // Extract and cleanup
+  await exec.exec("unzip", ["-o", "artifact.zip", "-d", workingDirectory]);
   await exec.exec("rm", ["artifact.zip"]);
 }
 
