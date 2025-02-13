@@ -292,6 +292,8 @@ async function downloadArtifact(token: string, artifactName: number | undefined,
     response.headers.location
   ]);
 
+  console.log(`local directory: ${await exec.exec("ls", [], { cwd: workingDirectory })}`);
+
   // Extract and cleanup
   await exec.exec("unzip", ["-o", "artifact.zip", "-d", workingDirectory]);
   await exec.exec("rm", ["artifact.zip"]);
