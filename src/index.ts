@@ -275,7 +275,7 @@ async function downloadArtifact(token: string, jobId: number,  artifactName: num
   }
 
   // Create cdktf.out directory
-  const cdktfOutPath = path.join(workingDirectory, "cdktf.out/");
+  const cdktfOutPath = path.join(workingDirectory, "cdktf.out");
   await io.mkdirP(cdktfOutPath);
 
   const response = await octokit.rest.actions.downloadArtifact({
