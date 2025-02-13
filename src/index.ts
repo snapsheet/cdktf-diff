@@ -253,10 +253,24 @@ async function downloadArtifact(token: string, artifactName: number | undefined,
 
   const octokit = github.getOctokit(token);
   
+  // List artifacts to find IDs
+  const artifactsResponse = await octokit.rest.actions.listArtifactsForRepo({
+    ...github.context.repo,
+    headers: {
+      "X-GitHub-Api-Version": "2022-11-28"
+    }
+  });
+
+  const artifactId = artifactsResponse.data.artifacts.find(artifact => artifact.name === artifactName.toString())?.id;
+
+  if (!artifactId) {
+    throw new Error(`Could not find artifact with name ${artifactName}`);
+  }
+
   // eslint-disable-next-line no-constant-condition
   const response = await octokit.rest.actions.downloadArtifact({
     ...github.context.repo,
-    artifact_id: artifactName,
+    artifact_id: artifactId,
     archive_format: "zip",
     headers: {
       "X-GitHub-Api-Version": "2022-11-28"
