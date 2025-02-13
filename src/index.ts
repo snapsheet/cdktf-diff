@@ -269,6 +269,9 @@ async function downloadArtifact(token: string, artifactName: number | undefined,
 
   // eslint-disable-next-line no-constant-condition
   const response = await octokit.rest.actions.downloadArtifact({
+    request: {
+      redirect: "manual",
+    },
     ...github.context.repo,
     artifact_id: artifactId,
     archive_format: "zip",
@@ -279,6 +282,7 @@ async function downloadArtifact(token: string, artifactName: number | undefined,
 
   console.log(`Response: ${JSON.stringify(response)}`);
 
+  await exec.exec("wget", [response.url || "artifact.zip"]);
   // Extract the artifact
   await exec.exec("unzip", ["-o", response.url || "artifact.zip", "-d", workingDirectory]);
   await exec.exec("rm", ["artifact.zip"]);
