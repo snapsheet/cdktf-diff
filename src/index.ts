@@ -288,7 +288,7 @@ async function downloadArtifact(token: string, jobId: number,  artifactName: num
     headers: {
       "X-GitHub-Api-Version": "2022-11-28"
     },
-    path: path.join(workingDirectory, "cdktf.out/")
+    path: cdktfOutPath
   });
 
   console.log(`Response: ${response}`);
