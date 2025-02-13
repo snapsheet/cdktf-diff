@@ -291,7 +291,8 @@ async function downloadArtifact(token: string, jobId: number,  artifactName: num
     path: cdktfOutPath
   });
 
-  console.log(`Response: ${response}`);
+  console.log(`Response data: ${response.data}`);
+  console.log(`Response headers: ${response.headers}`);
 
   if (!response.headers.location) {
     throw new Error("No location found in response");
@@ -300,7 +301,6 @@ async function downloadArtifact(token: string, jobId: number,  artifactName: num
   // Download the ZIP from the redirect URL
   const fileResult = await exec.exec("curl", [
     "-L",
-    "-H", `Authorization: token ${token}`,
     response.headers.location
   ], { cwd: cdktfOutPath });
 
