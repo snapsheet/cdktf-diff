@@ -285,18 +285,18 @@ async function downloadArtifact(token: string, artifactName: number | undefined,
   }
 
   // Create cdktf.out directory
-  const cdktfOutPath = path.join(workingDirectory, "cdktf.out");
+  const cdktfOutPath = path.join(workingDirectory, "cdktf.out/");
   await io.mkdirP(cdktfOutPath);
 
   // Download the ZIP from the redirect URL
   await exec.exec("curl", [
     "-L",
     "-H", `Authorization: token ${token}`,
-    "-o", cdktfOutPath,
+    "-o", path.join(cdktfOutPath, artifactName.toString()),
     response.headers.location
   ]);
 
-  console.log(`local directory: ${await exec.exec("ls", [], { cwd: `${workingDirectory}/cdktf.out` })}`);
+  console.log(`local directory: ${await exec.exec("ls", [], { cwd: cdktfOutPath })}`);
   // console.log(`file artifact.zip: ${await exec.exec("file artifact.zip", [], { cwd: workingDirectory })}`);
 
   // // Extract and cleanup
