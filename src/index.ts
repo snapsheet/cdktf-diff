@@ -39,7 +39,7 @@ interface ActionInputs {
   /** Whether to skip synthesis step */
   skipSynth: boolean;
   /** Optional artifact to download */
-  artifactName?: string;
+  artifactName?: number;
 }
 
 /**
@@ -82,7 +82,7 @@ export async function getInputs(): Promise<ActionInputs> {
     terraformVersion: core.getInput("terraform_version") || "1.8.0",
     workingDirectory: core.getInput("working_directory") || "./",
     skipSynth: core.getInput("skip_synth") === "true",
-    artifactName: core.getInput("artifact_name")
+    artifactName: core.getInput("artifact_name") ? Number(core.getInput("artifact_name")) : undefined,
   };
 }
 
@@ -247,18 +247,11 @@ async function runDiff(inputs: ActionInputs): Promise<{ resultCode: ActionOutput
  * @param artifactName - Name of the artifact to download
  * @param workingDirectory - Directory to download artifacts into
  */
-async function downloadArtifact(artifactName: string | undefined, workingDirectory: string): Promise<void> {
-  if (!artifactName) {
-    return;
-  }
+async function downloadArtifact(artifactName: number | undefined, workingDirectory: string): Promise<void> {
+  if (!artifactName) return;
 
-  console.log(`Downloading artifact: ${artifactName}`);
-  const artifactClient = artifact.create();
-  const downloadOptions = {
-    createArtifactFolder: false
-  };
+  await artifact.default.downloadArtifact(artifactName, { path: workingDirectory });
 
- await artifactClient.downloadArtifact(artifactName, workingDirectory, downloadOptions);
 }
 
 /**
