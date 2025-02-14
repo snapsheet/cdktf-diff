@@ -102,3 +102,9 @@ runs:
         INPUT_SKIP_SYNTH: ${{ inputs.skip_synth }}
         INPUT_ARTIFACT_NAME: ${{ inputs.artifact_name }}
       run: node ${{ github.action_path }}/dist/index.js
+
+    - uses: actions/upload-artifact@v4
+      name: Save Outputs
+      with:
+        name: ${{ steps.jobid_action.outputs.job_id }}
+        path: ${{ inputs.working_directory }}/${{ inputs.output_filename }}

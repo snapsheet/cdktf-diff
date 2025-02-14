@@ -7,8 +7,8 @@ import { RunDiff } from "./runDiff";
  */
 export default async function run(): Promise<void> {
   try {
-    const consolidator = new RunDiff();
-    await consolidator.run();
+    const diffPlan = new RunDiff();
+    await diffPlan.run();
   } catch (error) {
     // Fail the workflow run if an error occurs
     if (error instanceof Error) {
