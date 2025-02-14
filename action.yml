@@ -86,11 +86,8 @@ runs:
     - name: Print out current directory
       shell: bash
       run: |
-        ls -la ${{ github.action_path }}
+        ls -la ${{ github.action_path }}/dist
 
     - name: Run TypeScript Action
       shell: bash
-      run: |
-        pwd
-        ls -la
-        node ${{ github.action_path }}/dist/index.js
+      run: node ${{ github.action_path }}/dist/index.js
