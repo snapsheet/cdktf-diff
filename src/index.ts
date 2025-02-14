@@ -13,8 +13,9 @@ import * as exec from "@actions/exec";
 import * as fs from "fs";
 import * as path from "path";
 import * as io from "@actions/io";
-import { DefaultArtifactClient } from "@actions/artifact";
-
+import * as tmp from "tmp";
+import * as unzipper from "unzipper";
+import Axios from "axios";
 /**
  * Interface representing all possible inputs for the action.
  * These inputs are defined in action.yml and can be provided when using the action.
@@ -251,28 +252,80 @@ async function downloadArtifact(token: string, jobId: number, artifactName: numb
   if (!artifactName) return;
 
   console.log(`Downloading artifact: ${artifactName}`);
+  const octokit = github.getOctokit(token);
   
   // Create cdktf.out directory
   const cdktfOutPath = path.join(workingDirectory, "cdktf.out");
   await io.mkdirP(cdktfOutPath);
 
-  const findBy = {
-    token: token,
-    workflowRunId: jobId,
-    repositoryOwner: github.context.repo.owner,
-    repositoryName: github.context.repo.repo
-  };
+  const tmpFile = tmp.fileSync();
+  // get the artifact download URL
+  // artifacts are stored as zip files
 
-  const artifactClient = new DefaultArtifactClient();
-
-  const artifact = await artifactClient.getArtifact(artifactName.toString(), {
-    findBy
+  const artifactsResponse = await octokit.rest.actions.listArtifactsForRepo({
+    ...github.context.repo,
+    job_id: jobId,
+    per_page: 100
   });
 
-  const downloadedPath = await artifactClient.downloadArtifact(artifact.artifact.id, {
-    path: cdktfOutPath
+  const artifactId = artifactsResponse.data.artifacts.find(artifact => artifact.name === artifactName.toString())?.id;
+
+  if (!artifactId) {
+    throw new Error(`Could not find artifact with name ${artifactName}`);
+  }
+
+  const response = await octokit.rest.actions.downloadArtifact({
+    ...github.context.repo,
+    artifact_id: artifactId,
+    archive_format: "zip"
   });
-  console.log(`Downloaded artifact ${artifact.artifact.id} to: ${downloadedPath}`);
+  core.debug("Artifact URL Info:");
+  core.debug(JSON.stringify(response));
+
+  // download the zip file for the artifact
+  await downloadFile(response.url, tmpFile.name);
+  core.debug(`Artifact Zip File Saved To: ${tmpFile.name}`);
+
+  // extract the artifact to a temporary directory
+  await fs
+    .createReadStream(tmpFile.name)
+    .pipe(unzipper.Extract({ path: cdktfOutPath }))
+    .promise();
+  core.debug(
+    `Artifact Files Extracted To ${cdktfOutPath}`
+  );
+}
+
+/**
+   * Download from a HTTPS endpoint and stream directly to file.
+   *
+   * Sourced from https://stackoverflow.com/questions/55374755/node-js-axios-download-file-stream-and-writefile
+   */
+async function downloadFile(fileUrl: string, outputLocationPath: string) {
+  const writer = fs.createWriteStream(outputLocationPath);
+
+  return Axios({
+    method: "get",
+    url: fileUrl,
+    responseType: "stream"
+  }).then((response) => {
+    return new Promise((resolve, reject) => {
+      response.data.pipe(writer);
+      let error: Error | null = null;
+      writer.on("error", (err) => {
+        error = err;
+        writer.close();
+        reject(err);
+      });
+      writer.on("close", () => {
+        if (!error) {
+          resolve(true);
+        }
+        //no need to call the reject here, as it will have been called in the
+        //'error' stream;
+      });
+    });
+  });
 }
 
 /**
