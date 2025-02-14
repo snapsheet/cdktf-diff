@@ -83,11 +83,6 @@ runs:
         name: ${{ inputs.artifact_name }}
         path: ${{ inputs.working_directory }}/cdktf.out
 
-    - name: Print out current directory
-      shell: bash
-      run: |
-        ls -la ${{ github.action_path }}/dist
-
     - name: Run Diff Action
       id: diff_action
       shell: bash
