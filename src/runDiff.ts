@@ -92,17 +92,6 @@ export class RunDiff {
   }
 
   /**
-   * Octokit query parameters that are used across multiple API requests.
-   */
-  commonQueryParams() {
-    return {
-      owner: this.context.payload.organization.login,
-      repo: `${this.context.payload.repository?.name}`,
-      per_page: 100
-    };
-  }
-
-  /**
    * Runtime entrypoint. Query for the last successful ran (not reran) jobs prior to this job and
    * return the content of the outputs JSON as an output of this job. Outputs of this job will have
    * the same key/name as the strings defined in the `needs` configuration.
