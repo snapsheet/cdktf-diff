@@ -13,6 +13,7 @@ import * as exec from "@actions/exec";
 import * as fs from "fs";
 import * as path from "path";
 import * as io from "@actions/io";
+import { DefaultArtifactClient } from "@actions/artifact";
 
 
 /**
@@ -95,7 +96,7 @@ export async function getInputs(): Promise<ActionInputs> {
  * @returns Promise containing the job ID and HTML URL
  * @throws Error if the job cannot be found
  */
-async function getJobId(token: string, jobName: string): Promise<{ jobId: string; htmlUrl: string }> {
+async function getJobId(token: string, jobName: string): Promise<{ jobId: number; htmlUrl: string }> {
   const octokit = github.getOctokit(token);
   let page = 1;
   
@@ -111,7 +112,7 @@ async function getJobId(token: string, jobName: string): Promise<{ jobId: string
     const job = response.data.jobs.find(j => j.name === jobName);
     if (job) {
       return {
-        jobId: job.id.toString(),
+        jobId: job.id,
         htmlUrl: job.html_url || ""
       };
     }
@@ -247,110 +248,32 @@ async function runDiff(inputs: ActionInputs): Promise<{ resultCode: ActionOutput
  * @param artifactName - Name of the artifact to download
  * @param workingDirectory - Directory to download artifacts into
  */
-async function downloadArtifact(token: string, jobId: number,  artifactName: number | undefined, workingDirectory: string): Promise<void> {
+async function downloadArtifact(token: string, jobId: number, artifactName: number | undefined, workingDirectory: string): Promise<void> {
   if (!artifactName) return;
 
   console.log(`Downloading artifact: ${artifactName}`);
-
-  const octokit = github.getOctokit(token);
-
-  const findBy = {
-    token: token,
-    workflowRunId: jobId,
-    ...github.context.repo
-  };
-
-  // List artifacts from jobID to find IDs
-  const artifactsResponse = await octokit.rest.actions.listArtifactsForRepo({
-    ...findBy,
-    headers: {
-      "X-GitHub-Api-Version": "2022-11-28"
-    }
-  });
-
-  const artifactId = artifactsResponse.data.artifacts.find(artifact => artifact.name === artifactName.toString())?.id;
-
-  if (!artifactId) {
-    throw new Error(`Could not find artifact with name ${artifactName}`);
-  }
-
+  
   // Create cdktf.out directory
   const cdktfOutPath = path.join(workingDirectory, "cdktf.out");
   await io.mkdirP(cdktfOutPath);
 
-  const response = await octokit.rest.actions.downloadArtifact({
-    request: {
-      redirect: "manual",
-    },
-    ...github.context.repo,
-    artifact_id: artifactId,
-    archive_format: "zip",
-    headers: {
-      "X-GitHub-Api-Version": "2022-11-28"
-    },
-    path: cdktfOutPath
+  const findBy = {
+    token: token,
+    workflowRunId: jobId,
+    repositoryOwner: github.context.repo.owner,
+    repositoryName: github.context.repo.repo
+  };
+
+  const artifactClient = new DefaultArtifactClient();
+
+  const artifact = await artifactClient.getArtifact(artifactName.toString(), {
+    findBy
   });
 
-  console.log(`Response data: ${response.data}`);
-  console.log(`Response headers: ${response.headers}`);
-
-  if (!response.headers.location) {
-    throw new Error("No location found in response");
-  }
-
-  // Download the ZIP from the redirect URL
-  const fileResult = await exec.exec("curl", [
-    "-L",
-    response.headers.location
-  ], { cwd: cdktfOutPath });
-
-  console.log(`fileResult: ${fileResult}`);
-  // // List artifacts from jobID to find IDs
-  // const artifactsResponse = await octokit.rest.actions.listArtifactsForRepo({
-  //   ...github.context.repo,
-  //   ...findBy,
-  //   headers: {
-  //     "X-GitHub-Api-Version": "2022-11-28"
-  //   }
-  // });
-
-  // const artifactId = artifactsResponse.data.artifacts.find(artifact => artifact.name === artifactName.toString())?.id;
-
-  // if (!artifactId) {
-  //   throw new Error(`Could not find artifact with name ${artifactName}`);
-  // }
-
-  // // eslint-disable-next-line no-constant-condition
-  // const response = await octokit.rest.actions.downloadArtifact({
-  //   request: {
-  //     redirect: "manual",
-  //   },
-  //   ...github.context.repo,
-  //   artifact_id: artifactId,
-  //   archive_format: "zip",
-  //   headers: {
-  //     "X-GitHub-Api-Version": "2022-11-28"
-  //   }
-  // });
-
-  // console.log(`Response: ${response}`);
-
-  // if (!response.headers.location) {
-  //   throw new Error("No location found in response");
-  // }
-
-  
-
-
-
-
-  // console.log(`fileResult: ${fileResult}`);
-  console.log(`local directory: ${await exec.exec("ls", [], { cwd: cdktfOutPath })}`);
-  // console.log(`file artifact.zip: ${await exec.exec("file artifact.zip", [], { cwd: workingDirectory })}`);
-
-  // // Extract and cleanup
-  // await exec.exec("unzip", ["-o", path.join(workingDirectory, "artifact.zip"), "-d", workingDirectory]);
-  // await exec.exec("rm", [path.join(workingDirectory, "artifact.zip")]);
+  const downloadedPath = await artifactClient.downloadArtifact(artifact.artifact.id, {
+    path: cdktfOutPath
+  });
+  console.log(`Downloaded artifact ${artifact.artifact.id} to: ${downloadedPath}`);
 }
 
 /**
@@ -383,7 +306,7 @@ export default async function run(): Promise<void> {
     // Prepare outputs
     const outputs: ActionOutputs = {
       htmlUrl,
-      jobId,
+      jobId: jobId.toString(),
       resultCode,
       stack: inputs.stack,
       summary
