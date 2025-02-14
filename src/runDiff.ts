@@ -1,235 +1,314 @@
-import * as core from '@actions/core';
-import * as exec from '@actions/exec';
-import * as github from '@actions/github';
-import * as fs from 'fs';
-import * as path from 'path';
-import { Octokit } from '@octokit/core';
-import * as stream from 'stream';
-import { promisify } from 'util';
-import * as https from 'https';
+import * as github from "@actions/github";
+import * as core from "@actions/core";
+import * as exec from "@actions/exec";
+import * as path from "path";
+import * as io from "@actions/io";
+import * as fs from "fs";
+import { Context } from "@actions/github/lib/context";
+import { Octokit } from "@octokit/core";
 import { PaginateInterface } from "@octokit/plugin-paginate-rest";
 import { Api } from "@octokit/plugin-rest-endpoint-methods/dist-types/types";
 
+/**
+ * Interface representing all possible inputs for the action.
+ * These inputs are defined in action.yml and can be provided when using the action.
+ */
+interface ActionInputs {
+  /** GitHub token for API access */
+  githubToken: string;
+  /** Name of the workflow job */
+  jobName: string;
+  /** Name of the file to save results into */
+  outputFilename: string;
+  /** Git ref to diff against */
+  ref: string;
+  /** Name of the CDKTF stack to diff */
+  stack: string;
+  /** Optional file containing mock output for testing */
+  stubOutputFile?: string;
+  /** Version of Terraform to use */
+  terraformVersion: string;
+  /** Directory containing CDKTF code */
+  workingDirectory: string;
+  /** Whether to skip synthesis step */
+  skipSynth: boolean;
+  /** Optional artifact to download */
+  artifactName?: number;
+}
+
+/**
+ * Interface representing the structured outputs from the action.
+ * These outputs can be used by subsequent steps in the workflow.
+ */
+interface ActionOutputs {
+  /** Direct link to the job execution */
+  htmlUrl: string;
+  /** ID of the executed job */
+  jobId: string;
+  /** 
+   * Result code indicating the outcome:
+   * - '0': Success with no changes
+   * - '1': Error occurred
+   * - '2': Success with changes detected
+   */
+  resultCode: "0" | "1" | "2";
+  /** Name of the CDKTF stack used */
+  stack: string;
+  /** Human-readable summary of changes */
+  summary: string;
+}
+
+/**
+ * Consolidate the output of all jobs that came prior to this job and return as the output of this job.
+ */
 export class RunDiff {
-  private readonly githubToken: string;
-  private readonly jobName: string;
-  private readonly outputFilename: string;
-  private readonly stack: string;
-  private readonly stubOutputFile?: string;
-  private readonly terraformVersion: string;
-  private readonly workingDirectory: string;
-  private readonly skipSynth: boolean;
-  private readonly artifactName?: string;
-  private readonly ref: string;
-
   octokit: Octokit & Api & { paginate: PaginateInterface };
+  context: Context;
+  inputs: ActionInputs;
 
+  /**
+   * Initialize clients and member variables.
+   */
   constructor() {
-    this.githubToken = core.getInput('github_token', { required: true });
-    this.jobName = core.getInput('job_name', { required: true });
-    this.outputFilename = core.getInput('output_filename', { required: true });
-    this.stack = core.getInput('stack', { required: true });
-    this.stubOutputFile = core.getInput('stub_output_file');
-    this.terraformVersion = core.getInput('terraform_version');
-    this.workingDirectory = core.getInput('working_directory') || './';
-    this.skipSynth = core.getBooleanInput('skip_synth');
-    this.artifactName = core.getInput('artifact_name');
-    this.ref = core.getInput('ref', { required: true });
+    // Get inputs first
+    this.inputs = {
+      githubToken: core.getInput('github_token', { required: true }),
+      jobName: core.getInput('job_name', { required: true }),
+      outputFilename: core.getInput('output_filename', { required: true }),
+      ref: core.getInput('ref', { required: true }),
+      stack: core.getInput('stack', { required: true }),
+      stubOutputFile: core.getInput('stub_output_file'),
+      terraformVersion: core.getInput('terraform_version') || '1.8.0',
+      workingDirectory: core.getInput('working_directory') || './',
+      skipSynth: core.getBooleanInput('skip_synth'),
+      artifactName: core.getInput('artifact_name') ? Number(core.getInput('artifact_name')) : undefined,
+    };
 
-    this.octokit = github.getOctokit(this.githubToken);
+    // Then create octokit with the token
+    this.octokit = github.getOctokit(this.inputs.githubToken);
+    this.context = github.context;
+    core.debug("Context:");
+    core.debug(JSON.stringify(this.context));
   }
 
-  async run(): Promise<void> {
-    const jobInfo = await this.retrieveJobId();
-    await this.loadConfiguration();
-    await this.installNodeDependencies();
-    
-    if (this.artifactName) {
-      await this.downloadArtifact();
+  /**
+   * Octokit query parameters that are used across multiple API requests.
+   */
+  commonQueryParams() {
+    return {
+      owner: this.context.payload.organization.login,
+      repo: `${this.context.payload.repository?.name}`,
+      per_page: 100
+    };
+  }
+
+  /**
+   * Runtime entrypoint. Query for the last successful ran (not reran) jobs prior to this job and
+   * return the content of the outputs JSON as an output of this job. Outputs of this job will have
+   * the same key/name as the strings defined in the `needs` configuration.
+   */
+  async run() {
+    // Get job information
+    const { jobId, htmlUrl } = await this.getJobId();
+
+    // Run the diff
+    const { resultCode, summary } = await this.runDiff();
+
+    console.log(`Summary of diff: ${summary}`);
+
+    // Prepare outputs
+    const outputs: ActionOutputs = {
+      htmlUrl,
+      jobId: jobId.toString(),
+      resultCode,
+      stack: this.inputs.stack,
+      summary
+    };
+
+    // Set action outputs
+    Object.entries(outputs).forEach(([key, value]) => {
+      core.setOutput(key, value);
+    });
+
+    // Write outputs to file
+    const outputPath = path.join(this.inputs.workingDirectory, this.inputs.outputFilename);
+    fs.writeFileSync(outputPath, JSON.stringify(outputs));
+
+  } catch (error: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
+    if (error instanceof Error) {
+      core.setFailed(error.message);
+    } else {
+      core.setFailed(String(error));
     }
-    
-    const diffResult = await this.runDiff();
-    await this.dumpOutputs(jobInfo, diffResult);
-    await this.saveOutputs();
   }
 
-  private async retrieveJobId(): Promise<{ jobId: string; htmlUrl: string }> {
-    const octokit = github.getOctokit(this.githubToken);
+  /**
+   * Retrieves the job ID and HTML URL for the current workflow job.
+   * Supports pagination when querying the GitHub API.
+   * 
+   * @param jobName - Name of the job to find
+   * @returns Promise containing the job ID and HTML URL
+   * @throws Error if the job cannot be found
+   */
+  async getJobId(): Promise<{ jobId: number; htmlUrl: string }> {
     let page = 1;
-    
+
+    // eslint-disable-next-line no-constant-condition
     while (true) {
-      const response = await octokit.rest.actions.listJobsForWorkflowRun({
+      const response = await this.octokit.rest.actions.listJobsForWorkflowRun({
         ...github.context.repo,
         run_id: github.context.runId,
         per_page: 100,
         page
       });
 
-      const job = response.data.jobs.find(j => j.name === this.jobName);
+      const job = response.data.jobs.find(j => j.name === this.inputs.jobName);
       if (job) {
-        core.setOutput('job_id', job.id.toString());
-        core.setOutput('html_url', job.html_url || '');
-        return { jobId: job.id.toString(), htmlUrl: job.html_url || '' };
+        return {
+          jobId: job.id,
+          htmlUrl: job.html_url || ""
+        };
       }
 
-      if (response.data.jobs.length < 100) break;
+      if (response.data.jobs.length < 100) {
+        throw new Error(`Could not find job with name ${this.inputs.jobName}`);
+      }
+
       page++;
     }
-
-    throw new Error(`Could not find job with name ${this.jobName}`);
   }
 
-  private async loadConfiguration(): Promise<string> {
-    const nvmrcPath = path.join(this.workingDirectory, '.nvmrc');
-    const nodeVersion = fs.readFileSync(nvmrcPath, 'utf8').trim();
-    core.setOutput('node_version', nodeVersion);
-    return nodeVersion;
+  /**
+   * Sets up Terraform with the specified version
+   * 
+   * @param version - Terraform version to install
+   */
+  async setupTerraform(): Promise<void> {
+    // Using the setup-terraform action's functionality via CLI
+    await exec.exec("curl", [
+      "-o", "terraform.zip",
+      `https://releases.hashicorp.com/terraform/${this.inputs.terraformVersion}/terraform_${this.inputs.terraformVersion}_linux_amd64.zip`
+    ]);
+    await exec.exec("unzip", ["terraform.zip"]);
+    await io.mv("terraform", "/usr/local/bin/terraform");
+    await exec.exec("terraform", ["version"]);
+
+    console.log(`Setting up Terraform version ${this.inputs.terraformVersion}...`);
+    console.log("Terraform setup complete");
   }
 
-  private async installNodeDependencies(): Promise<void> {
-    await exec.exec('npm', ['ci'], { cwd: this.workingDirectory });
-  }
+  /**
+   * Sets up Node.js environment and installs dependencies
+   * 
+   * @param workingDirectory - Directory containing package.json
+   */
+  async setupNodeEnvironment(): Promise<void> {
+    // Read .nvmrc file to get Node version
+    const nvmrcPath = path.join(this.inputs.workingDirectory, ".nvmrc");
+    let nodeVersion: string;
 
-  private async downloadArtifact(): Promise<void> {
-    if (!this.artifactName) return;
-
-    const octokit = github.getOctokit(this.githubToken);
-    
-    // Get list of artifacts for this workflow run
-    const artifactsResponse = await octokit.rest.actions.listWorkflowRunArtifacts({
-      ...github.context.repo,
-      run_id: github.context.runId,
-    });
-
-    // Find the artifact we want
-    const artifact = artifactsResponse.data.artifacts.find(
-      a => a.name === this.artifactName
-    );
-
-    if (!artifact) {
-      throw new Error(`No artifact found with name: ${this.artifactName}`);
-    }
-
-    // Get download URL for the artifact
-    const downloadResponse = await octokit.rest.actions.downloadArtifact({
-      ...github.context.repo,
-      artifact_id: artifact.id,
-      archive_format: 'zip',
-    });
-
-    if (!downloadResponse.url) {
-      throw new Error('No download URL found for artifact');
-    }
-
-    // Create the cdktf.out directory if it doesn't exist
-    const outputDir = path.join(this.workingDirectory, 'cdktf.out');
-    await fs.promises.mkdir(outputDir, { recursive: true });
-
-    // Download and extract the zip file
-    const zipPath = path.join(outputDir, 'artifact.zip');
-    await this.downloadFile(downloadResponse.url, zipPath);
-
-    // Extract the zip file
-    const extract = require('extract-zip');
-    await extract(zipPath, { dir: outputDir });
-
-    // Clean up the zip file
-    await fs.promises.unlink(zipPath);
-  }
-
-  private async downloadFile(url: string, destPath: string): Promise<void> {
-    const finished = promisify(stream.finished);
-    const fileStream = fs.createWriteStream(destPath);
-
-    return new Promise((resolve, reject) => {
-      https.get(url, response => {
-        if (response.statusCode !== 200) {
-          reject(new Error(`Failed to download: ${response.statusCode} ${response.statusMessage}`));
-          return;
-        }
-
-        response.pipe(fileStream);
-        finished(fileStream)
-          .then(() => resolve())
-          .catch(reject);
-      }).on('error', reject);
-    });
-  }
-
-  private async runDiff(): Promise<{ resultCode: number; summary: string }> {
-    let command = 'CI=1 npx cdktf diff';
-    
-    if (this.stubOutputFile) {
-      command = `cat ${this.stubOutputFile} | perl -pe "select undef,undef,undef,.05"`;
-    }
-
-    if (this.skipSynth) {
-      command += ' --skip-synth';
-    }
-
-    command += ` ${this.stack}`;
-
-    const tempFile = path.join(process.env.TMPDIR || '/tmp', 'cdktf-diff.txt');
-    let output = '';
-    
     try {
-      await exec.exec(command, [], {
-        cwd: this.workingDirectory,
+      console.log(`Check working directory: ${this.inputs.workingDirectory}`);
+      console.log(`ls working directory: ${await exec.exec("ls", [], { cwd: this.inputs.workingDirectory })}`);
+
+      nodeVersion = fs.readFileSync(nvmrcPath, "utf8").trim();
+    } catch (error) {
+      throw new Error("Failed to read .nvmrc file. Make sure it exists in your working directory.");
+    }
+
+    // Setup Node.js with the specified version
+    const setupScript = `
+      curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+      export NVM_DIR="$HOME/.nvm"
+      [ -s "$NVM_DIR/nvm.sh" ] && \\. "$NVM_DIR/nvm.sh"
+      nvm install ${nodeVersion}
+      nvm use ${nodeVersion}
+    `;
+
+    await exec.exec("bash", ["-c", setupScript], { cwd: this.inputs.workingDirectory });
+
+    // Install dependencies
+    await exec.exec("npm", ["ci"], { cwd: this.inputs.workingDirectory });
+
+    console.log(`Setting up Node.js environment in ${this.inputs.workingDirectory}...`);
+    console.log(`Using Node.js version from .nvmrc: ${nodeVersion}`);
+    console.log("Node.js environment setup complete");
+  }
+
+  /**
+   * Executes the CDKTF diff command and processes its output.
+   * Supports both real execution and test mode with stub output.
+   * 
+   * @param inputs - Validated action inputs
+   * @returns Promise containing result code and summary
+   * @throws Error if the diff execution fails unexpectedly
+   */
+  async runDiff(): Promise<{ resultCode: ActionOutputs["resultCode"]; summary: string }> {
+    const outputPath = path.join(process.env.TMPDIR || "/tmp", "cdktf-diff.txt");
+    let diffCommand = this.inputs.stubOutputFile ? 
+      `cat ${this.inputs.stubOutputFile}` :
+      "CI=1 npx cdktf diff";
+
+    if (this.inputs.skipSynth) {
+      diffCommand += " --skip-synth";
+    }
+    diffCommand += ` ${this.inputs.stack}`;
+
+    console.log(`Diff command before exec: ${diffCommand}`);
+    try {
+      let output = "";
+      await exec.exec("bash", ["-c", diffCommand], {
         listeners: {
           stdout: (data: Buffer) => {
             output += data.toString();
+          },
+          stderr: (data: Buffer) => {
+            output += data.toString();
           }
-        }
+        },
+        cwd: this.inputs.workingDirectory
       });
 
-      fs.writeFileSync(tempFile, output);
-      
-      // Parse the output and determine the result
-      const cleanOutput = this.stripAnsiCodes(output);
-      
-      if (cleanOutput.includes('Planning failed. Terraform encountered an error')) {
-        const summary = cleanOutput.match(/Error: .*/)?.[0] || 'Unknown error';
-        return { resultCode: 1, summary };
+      // Write output to file for parsing
+      fs.writeFileSync(outputPath, output);
+      // eslint-disable-next-line no-control-regex
+      const cleanOutput = output.replace(/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]/g, "");
+
+      // Check for various output patterns and determine result
+      if (cleanOutput.includes("Planning failed. Terraform encountered an error")) {
+        const summary = cleanOutput.match(/Error: .*/)?.[0] || "Unknown error occurred";
+        return { resultCode: "1", summary };
       }
 
-      if (cleanOutput.includes('No changes. Your infrastructure matches the configuration')) {
-        return { resultCode: 0, summary: 'No changes. Your infrastructure matches the configuration' };
+      if (cleanOutput.includes("No changes. Your infrastructure matches the configuration.")) {
+        return { resultCode: "0", summary: "No changes. Your infrastructure matches the configuration." };
       }
 
       const planMatch = cleanOutput.match(/Plan:.*/);
       if (planMatch) {
-        return { resultCode: 2, summary: planMatch[0] };
+        return { resultCode: "2", summary: planMatch[0] };
       }
 
-      throw new Error('Could not determine if diff ran successfully');
+      throw new Error("Could not determine if diff ran successfully");
     } catch (error) {
-      return { resultCode: 1, summary: error instanceof Error ? error.message : 'Unknown error' };
+      return { resultCode: "1", summary: (error as Error).message };
     }
   }
 
-  private stripAnsiCodes(str: string): string {
-    return str.replace(/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]/g, '');
+  /**
+   * Read the outputs from the artifact directory path.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  readOutputs(artifactDirectoryPath: string): any {
+    const outputFilename = core.getInput("output_filename");
+    const readData = fs.readFileSync(
+      `${artifactDirectoryPath}/${outputFilename}`,
+      {
+        encoding: "utf8",
+        flag: "r"
+      }
+    );
+    core.debug(`Output File Contents: ${readData}`);
+    return JSON.parse(readData);
   }
-
-  private async dumpOutputs(
-    jobInfo: { jobId: string; htmlUrl: string },
-    diffResult: { resultCode: number; summary: string }
-  ): Promise<void> {
-    const outputs = {
-      result_code: diffResult.resultCode,
-      summary: diffResult.summary,
-      html_url: jobInfo.htmlUrl,
-      stack: this.stack,
-      job_id: jobInfo.jobId,
-      node_version: await this.loadConfiguration(),
-      terraform_version: this.terraformVersion
-    };
-
-    const outputPath = path.join(this.workingDirectory, this.outputFilename);
-    fs.writeFileSync(outputPath, JSON.stringify(outputs));
-  }
-
-  private async saveOutputs(): Promise<void> {
-    // Note: Using actions/upload-artifact in the workflow instead of the API
-  }
-} 
+}

@@ -1,10 +1,10 @@
 {
   "compilerOptions": {
     "alwaysStrict": true,
+    "charset": "utf8",
     "declaration": true,
     "esModuleInterop": true,
     "experimentalDecorators": true,
-    "incremental": true,
     "inlineSources": true,
     "lib": [
       "es2018"
@@ -17,15 +17,21 @@
     "noImplicitThis": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "outDir": "./dist",
+    "outDir": "out",
     "resolveJsonModule": true,
-    "skipLibCheck": true,
+    "rootDir": "src",
     "sourceMap": true,
+    "strict": true,
     "strictNullChecks": true,
     "strictPropertyInitialization": true,
-    "target": "ES2018"
+    "stripInternal": true,
+    "target": "ES2018",
+    "incremental": true,
+    "skipLibCheck": true
   },
-  "include": ["src"],
+  "include": [
+    "src/*.ts"
+  ],
   "exclude": [
     "node_modules",
     "**/__tests__/*"
