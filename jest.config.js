@@ -1,4 +1,3 @@
-
 /** @type {import('ts-jest/dist/types').InitialOptionsTsJest} */
 /*
  * For a detailed explanation regarding each configuration property, visit:
