@@ -3,14 +3,11 @@ import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as path from "path";
 import * as io from "@actions/io";
-import Axios from "axios";
-import * as tmp from "tmp";
 import * as fs from "fs";
 import { Context } from "@actions/github/lib/context";
 import { Octokit } from "@octokit/core";
 import { PaginateInterface } from "@octokit/plugin-paginate-rest";
 import { Api } from "@octokit/plugin-rest-endpoint-methods/dist-types/types";
-import * as unzipper from "unzipper";
 
 /**
  * Interface representing all possible inputs for the action.
@@ -67,16 +64,12 @@ interface ActionOutputs {
 export class RunDiff {
   octokit: Octokit & Api & { paginate: PaginateInterface };
   context: Context;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  schema: any;
   inputs: ActionInputs;
 
   /**
    * Initialize clients and member variables.
    */
   constructor() {
-    tmp.setGracefulCleanup(); // delete tmp files on process exit
-
     this.inputs = {} as ActionInputs;
     this.octokit = github.getOctokit(this.inputs.githubToken);
     this.context = github.context;
@@ -106,13 +99,6 @@ export class RunDiff {
     
     // Get job information
     const { jobId, htmlUrl } = await this.getJobId();
-
-    // // Setup required tools
-    await this.setupTerraform();
-    await this.setupNodeEnvironment();
-
-    // Download artifacts if specified
-    await this.downloadArtifactFile(jobId);
 
     // Run the diff
     const { resultCode, summary } = await this.runDiff();
@@ -321,59 +307,6 @@ export class RunDiff {
   }
 
   /**
-   * Download and unpack an artifact to a temporary directory. Return the directory name.
-   */
-  async downloadArtifactFile(jobId: number): Promise<string | undefined>  {
-    if (!this.inputs.artifactName) return;
-
-    const tmpFile = tmp.fileSync();
-    // Create cdktf.out directory
-    const cdktfOutPath = path.join(this.inputs.workingDirectory, "cdktf.out");
-    await io.mkdirP(cdktfOutPath);
-
-    // list artifacts for this specific job
-    // this is needed to find the artifact ID from the name supplied in the inputs
-    const artifactsResponse = await this.octokit.rest.actions.listArtifactsForRepo({
-      ...github.context.repo,
-      job_id: jobId,
-      per_page: 100
-    });
-
-    const artifactId = artifactsResponse.data.artifacts.find(artifact => artifact.name === this.inputs.artifactName?.toString())?.id;
-
-    if (!artifactId) {
-      throw new Error(`Could not find artifact with name ${this.inputs.artifactName}`);
-    }
-
-    // get the artifact download URL
-    // artifacts are stored as zip files
-    const response = await this.octokit.rest.actions.downloadArtifact({
-      ...this.commonQueryParams(),
-      artifact_id: artifactId,
-      archive_format: "zip"
-    });
-    core.debug("Artifact URL Info:");
-    core.debug(JSON.stringify(response));
-
-    // download the zip file for the artifact
-    await this.downloadFile(response.url, tmpFile.name);
-    core.debug(`Artifact Zip File Saved To: ${tmpFile.name}`);
-
-    // extract the artifact to a temporary directory
-    await fs
-      .createReadStream(tmpFile.name)
-      .pipe(unzipper.Extract({ path: cdktfOutPath }))
-      .promise();
-    core.debug(
-      `Artifact Files Extracted To ${cdktfOutPath}: ${JSON.stringify(
-        fs.readdirSync(cdktfOutPath)
-      )}`
-    );
-
-    return cdktfOutPath;
-  }
-
-  /**
    * Read the outputs from the artifact directory path.
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -388,37 +321,5 @@ export class RunDiff {
     );
     core.debug(`Output File Contents: ${readData}`);
     return JSON.parse(readData);
-  }
-
-  /**
-   * Download from a HTTPS endpoint and stream directly to file.
-   *
-   * Sourced from https://stackoverflow.com/questions/55374755/node-js-axios-download-file-stream-and-writefile
-   */
-  async downloadFile(fileUrl: string, outputLocationPath: string) {
-    const writer = fs.createWriteStream(outputLocationPath);
-
-    return Axios({
-      method: "get",
-      url: fileUrl,
-      responseType: "stream"
-    }).then((response) => {
-      return new Promise((resolve, reject) => {
-        response.data.pipe(writer);
-        let error: Error | null = null;
-        writer.on("error", (err) => {
-          error = err;
-          writer.close();
-          reject(err);
-        });
-        writer.on("close", () => {
-          if (!error) {
-            resolve(true);
-          }
-          //no need to call the reject here, as it will have been called in the
-          //'error' stream;
-        });
-      });
-    });
   }
 }

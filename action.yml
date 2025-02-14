@@ -47,5 +47,42 @@ outputs:
     value: ${{ steps.diff.outputs.summary }}
 
 runs:
-  main: dist/index.js
-  using: node20
+  using: composite
+  steps:
+    - uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ inputs.terraform_version }}
+
+    - uses: actions/checkout@v4
+      id: checkout
+      with:
+        fetch-depth: 0
+        ref: ${{ inputs.ref }}
+
+    - name: Load Configuration
+      id: configurations
+      shell: bash
+      run: |
+        cd ${{ inputs.working_directory }}
+        echo "node_version=$(cat .nvmrc)" >> $GITHUB_OUTPUT
+
+    - uses: actions/setup-node@v4
+      with:
+        node-version: ${{ steps.configurations.outputs.node_version }}
+
+    - name: Install Node Dependencies
+      shell: bash
+      run: |
+        cd ${{ inputs.working_directory }}
+        npm ci
+    
+    - name: Download Artifact Files
+      if: ${{ inputs.artifact_name }}
+      uses: actions/download-artifact@v4
+      with:
+        name: ${{ inputs.artifact_name }}
+        path: ${{ inputs.working_directory }}/cdktf.out
+
+    - name: Run TypeScript Action
+      shell: bash
+      run: node dist/index.js
