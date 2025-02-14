@@ -15,7 +15,6 @@ import * as path from "path";
 import * as io from "@actions/io";
 import { DefaultArtifactClient } from "@actions/artifact";
 
-
 /**
  * Interface representing all possible inputs for the action.
  * These inputs are defined in action.yml and can be provided when using the action.
