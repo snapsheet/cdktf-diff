@@ -13,7 +13,6 @@ import * as exec from "@actions/exec";
 import * as fs from "fs";
 import * as path from "path";
 import * as io from "@actions/io";
-import * as tmp from "tmp";
 import * as unzipper from "unzipper";
 import Axios from "axios";
 /**
@@ -258,9 +257,8 @@ async function downloadArtifact(token: string, jobId: number, artifactName: numb
   const cdktfOutPath = path.join(workingDirectory, "cdktf.out");
   await io.mkdirP(cdktfOutPath);
 
-  const tmpFile = tmp.fileSync();
-  // get the artifact download URL
-  // artifacts are stored as zip files
+  // Create temp file for artifact download
+  const artifactFile = path.join(cdktfOutPath, artifactName.toString());
 
   const artifactsResponse = await octokit.rest.actions.listArtifactsForRepo({
     ...github.context.repo,
@@ -283,16 +281,16 @@ async function downloadArtifact(token: string, jobId: number, artifactName: numb
   core.debug(JSON.stringify(response));
 
   // download the zip file for the artifact
-  await downloadFile(response.url, tmpFile.name);
-  core.debug(`Artifact Zip File Saved To: ${tmpFile.name}`);
+  await downloadFile(response.url, artifactFile);
+  core.debug(`Artifact Zip File Saved To: ${cdktfOutPath}`);
 
   // extract the artifact to a temporary directory
   await fs
-    .createReadStream(tmpFile.name)
+    .createReadStream(artifactFile)
     .pipe(unzipper.Extract({ path: cdktfOutPath }))
     .promise();
   core.debug(
-    `Artifact Files Extracted To ${cdktfOutPath}`
+    `Artifact Files Extracted To ${artifactFile}`
   );
 }
 
