@@ -83,6 +83,11 @@ runs:
         name: ${{ inputs.artifact_name }}
         path: ${{ inputs.working_directory }}/cdktf.out
 
+    - name: Print out current directory
+      shell: bash
+      run: |
+        ls -la
+
     - name: Run TypeScript Action
       shell: bash
       run: node dist/index.js
