@@ -109,7 +109,7 @@ export class RunDiff {
    */
   async run() {
     // Get job information
-    const { jobId, html_url } = await this.getJobId();
+    const { job_id, html_url } = await this.getJobId();
 
     // Run the diff
     const { result_code, summary } = await this.runDiff();
@@ -119,7 +119,7 @@ export class RunDiff {
     // Prepare outputs
     const outputs: ActionOutputs = {
       html_url,
-      job_id: jobId.toString(),
+      job_id: job_id.toString(),
       result_code,
       stack: this.inputs.stack,
       summary
@@ -150,7 +150,7 @@ export class RunDiff {
    * @returns Promise containing the job ID and HTML URL
    * @throws Error if the job cannot be found
    */
-  async getJobId(): Promise<{ jobId: number; html_url: string }> {
+  async getJobId(): Promise<{ job_id: number; html_url: string }> {
     let page = 1;
 
     // eslint-disable-next-line no-constant-condition
@@ -165,7 +165,7 @@ export class RunDiff {
       const job = response.data.jobs.find(j => j.name === this.inputs.jobName);
       if (job) {
         return {
-          jobId: job.id,
+          job_id: job.id,
           html_url: job.html_url || ""
         };
       }

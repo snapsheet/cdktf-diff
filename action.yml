@@ -102,5 +102,5 @@ runs:
     - uses: actions/upload-artifact@v4
       name: Save Outputs
       with:
-        name: ${{ steps.diff_action.outputs.jobId }}
+        name: ${{ steps.diff_action.outputs.job_id }}
         path: ${{ inputs.working_directory }}/${{ inputs.output_filename }}
