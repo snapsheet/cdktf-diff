@@ -89,6 +89,7 @@ runs:
         ls -la ${{ github.action_path }}/dist
 
     - name: Run Diff Action
+      id: diff_action
       shell: bash
       env:
         INPUT_GITHUB_TOKEN: ${{ inputs.github_token }}
@@ -106,5 +107,5 @@ runs:
     - uses: actions/upload-artifact@v4
       name: Save Outputs
       with:
-        name: ${{ steps.jobid_action.outputs.job_id }}
+        name: ${{ steps.diff_action.outputs.jobId }}
         path: ${{ inputs.working_directory }}/${{ inputs.output_filename }}
