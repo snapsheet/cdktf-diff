@@ -75,7 +75,7 @@ runs:
       run: |
         cd ${{ inputs.working_directory }}
         npm ci
-    
+
     - name: Download Artifact Files
       if: ${{ inputs.artifact_name }}
       uses: actions/download-artifact@v4
@@ -86,8 +86,11 @@ runs:
     - name: Print out current directory
       shell: bash
       run: |
-        ls -la
+        ls -la ${{ github.action_path }}
 
     - name: Run TypeScript Action
       shell: bash
-      run: node dist/index.js
+      run: |
+        pwd
+        ls -la
+        node ${{ github.action_path }}/dist/index.js
