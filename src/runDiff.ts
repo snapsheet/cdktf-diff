@@ -42,16 +42,16 @@ interface ActionInputs {
  */
 interface ActionOutputs {
   /** Direct link to the job execution */
-  htmlUrl: string;
+  html_url: string;
   /** ID of the executed job */
-  jobId: string;
+  job_id: string;
   /** 
    * Result code indicating the outcome:
    * - '0': Success with no changes
    * - '1': Error occurred
    * - '2': Success with changes detected
    */
-  resultCode: "0" | "1" | "2";
+  result_code: "0" | "1" | "2";
   /** Name of the CDKTF stack used */
   stack: string;
   /** Human-readable summary of changes */
@@ -109,18 +109,18 @@ export class RunDiff {
    */
   async run() {
     // Get job information
-    const { jobId, htmlUrl } = await this.getJobId();
+    const { jobId, html_url } = await this.getJobId();
 
     // Run the diff
-    const { resultCode, summary } = await this.runDiff();
+    const { result_code, summary } = await this.runDiff();
 
     console.log(`Summary of diff: ${summary}`);
 
     // Prepare outputs
     const outputs: ActionOutputs = {
-      htmlUrl,
-      jobId: jobId.toString(),
-      resultCode,
+      html_url,
+      job_id: jobId.toString(),
+      result_code,
       stack: this.inputs.stack,
       summary
     };
@@ -150,7 +150,7 @@ export class RunDiff {
    * @returns Promise containing the job ID and HTML URL
    * @throws Error if the job cannot be found
    */
-  async getJobId(): Promise<{ jobId: number; htmlUrl: string }> {
+  async getJobId(): Promise<{ jobId: number; html_url: string }> {
     let page = 1;
 
     // eslint-disable-next-line no-constant-condition
@@ -166,7 +166,7 @@ export class RunDiff {
       if (job) {
         return {
           jobId: job.id,
-          htmlUrl: job.html_url || ""
+          html_url: job.html_url || ""
         };
       }
 
@@ -243,7 +243,7 @@ export class RunDiff {
    * @returns Promise containing result code and summary
    * @throws Error if the diff execution fails unexpectedly
    */
-  async runDiff(): Promise<{ resultCode: ActionOutputs["resultCode"]; summary: string }> {
+  async runDiff(): Promise<{ result_code: ActionOutputs["result_code"]; summary: string }> {
     const outputPath = path.join(process.env.TMPDIR || "/tmp", "cdktf-diff.txt");
     let diffCommand = this.inputs.stubOutputFile ? 
       `cat ${this.inputs.stubOutputFile}` :
@@ -277,21 +277,21 @@ export class RunDiff {
       // Check for various output patterns and determine result
       if (cleanOutput.includes("Planning failed. Terraform encountered an error")) {
         const summary = cleanOutput.match(/Error: .*/)?.[0] || "Unknown error occurred";
-        return { resultCode: "1", summary };
+        return { result_code: "1", summary };
       }
 
       if (cleanOutput.includes("No changes. Your infrastructure matches the configuration.")) {
-        return { resultCode: "0", summary: "No changes. Your infrastructure matches the configuration." };
+        return { result_code: "0", summary: "No changes. Your infrastructure matches the configuration." };
       }
 
       const planMatch = cleanOutput.match(/Plan:.*/);
       if (planMatch) {
-        return { resultCode: "2", summary: planMatch[0] };
+        return { result_code: "2", summary: planMatch[0] };
       }
 
       throw new Error("Could not determine if diff ran successfully");
     } catch (error) {
-      return { resultCode: "1", summary: (error as Error).message };
+      return { result_code: "1", summary: (error as Error).message };
     }
   }
 
