@@ -25,7 +25,7 @@
     "strictPropertyInitialization": true,
     "target": "ES2018"
   },
-  "include": ["src"],
+  "include": ["src", "__tests__"],
   "exclude": [
     "node_modules",
     "**/__tests__/*"

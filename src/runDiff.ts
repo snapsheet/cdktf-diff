@@ -2,7 +2,6 @@ import * as github from "@actions/github";
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as path from "path";
-import * as io from "@actions/io";
 import * as fs from "fs";
 import { Context } from "@actions/github/lib/context";
 import { Octokit } from "@octokit/core";
@@ -122,13 +121,6 @@ export class RunDiff {
     // Write outputs to file
     const outputPath = path.join(this.inputs.workingDirectory, this.inputs.outputFilename);
     fs.writeFileSync(outputPath, JSON.stringify(outputs));
-
-  } catch (error: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
-    if (error instanceof Error) {
-      core.setFailed(error.message);
-    } else {
-      core.setFailed(String(error));
-    }
   }
 
   /**
@@ -165,63 +157,6 @@ export class RunDiff {
 
       page++;
     }
-  }
-
-  /**
-   * Sets up Terraform with the specified version
-   * 
-   * @param version - Terraform version to install
-   */
-  async setupTerraform(): Promise<void> {
-    // Using the setup-terraform action's functionality via CLI
-    await exec.exec("curl", [
-      "-o", "terraform.zip",
-      `https://releases.hashicorp.com/terraform/${this.inputs.terraformVersion}/terraform_${this.inputs.terraformVersion}_linux_amd64.zip`
-    ]);
-    await exec.exec("unzip", ["terraform.zip"]);
-    await io.mv("terraform", "/usr/local/bin/terraform");
-    await exec.exec("terraform", ["version"]);
-
-    console.log(`Setting up Terraform version ${this.inputs.terraformVersion}...`);
-    console.log("Terraform setup complete");
-  }
-
-  /**
-   * Sets up Node.js environment and installs dependencies
-   * 
-   * @param workingDirectory - Directory containing package.json
-   */
-  async setupNodeEnvironment(): Promise<void> {
-    // Read .nvmrc file to get Node version
-    const nvmrcPath = path.join(this.inputs.workingDirectory, ".nvmrc");
-    let nodeVersion: string;
-
-    try {
-      console.log(`Check working directory: ${this.inputs.workingDirectory}`);
-      console.log(`ls working directory: ${await exec.exec("ls", [], { cwd: this.inputs.workingDirectory })}`);
-
-      nodeVersion = fs.readFileSync(nvmrcPath, "utf8").trim();
-    } catch (error) {
-      throw new Error("Failed to read .nvmrc file. Make sure it exists in your working directory.");
-    }
-
-    // Setup Node.js with the specified version
-    const setupScript = `
-      curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
-      export NVM_DIR="$HOME/.nvm"
-      [ -s "$NVM_DIR/nvm.sh" ] && \\. "$NVM_DIR/nvm.sh"
-      nvm install ${nodeVersion}
-      nvm use ${nodeVersion}
-    `;
-
-    await exec.exec("bash", ["-c", setupScript], { cwd: this.inputs.workingDirectory });
-
-    // Install dependencies
-    await exec.exec("npm", ["ci"], { cwd: this.inputs.workingDirectory });
-
-    console.log(`Setting up Node.js environment in ${this.inputs.workingDirectory}...`);
-    console.log(`Using Node.js version from .nvmrc: ${nodeVersion}`);
-    console.log("Node.js environment setup complete");
   }
 
   /**
@@ -284,20 +219,4 @@ export class RunDiff {
     }
   }
 
-  /**
-   * Read the outputs from the artifact directory path.
-   */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  readOutputs(artifactDirectoryPath: string): any {
-    const outputFilename = core.getInput("output_filename");
-    const readData = fs.readFileSync(
-      `${artifactDirectoryPath}/${outputFilename}`,
-      {
-        encoding: "utf8",
-        flag: "r"
-      }
-    );
-    core.debug(`Output File Contents: ${readData}`);
-    return JSON.parse(readData);
-  }
 }
