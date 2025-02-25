@@ -11,9 +11,7 @@ export default async function run(): Promise<void> {
     await diffPlan.run();
   } catch (error) {
     // Fail the workflow run if an error occurs
-    if (error instanceof Error) {
-      core.setFailed(error.message);
-    }
+    core.setFailed(error instanceof Error ? error.message : error);
   }
 }
 
