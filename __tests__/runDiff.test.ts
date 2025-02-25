@@ -334,9 +334,60 @@ describe("RunDiff", () => {
         expect.any(Object)
       );
     });
+
+    it("should capture both stdout and stderr output", async () => {
+      // Mock exec to simulate output to both streams
+      (exec.exec as jest.Mock).mockImplementation((_cmd: string, _args: string[], opts?: { listeners?: { stdout?: (data: Buffer) => void; stderr?: (data: Buffer) => void } }) => {
+        if (opts?.listeners?.stdout) {
+          opts.listeners.stdout(Buffer.from("Plan: 1 to add"));
+        }
+        if (opts?.listeners?.stderr) {
+          opts.listeners.stderr(Buffer.from(", 0 to change, 0 to destroy."));
+        }
+        return Promise.resolve(0);
+      });
+
+      const runDiff = new RunDiff();
+      const result = await runDiff.runDiff();
+
+      // Verify combined output is processed correctly
+      expect(result).toEqual({
+        result_code: "2",
+        summary: "Plan: 1 to add, 0 to change, 0 to destroy."
+      });
+    });
   });
 
   describe("run", () => {
+    it("should fail the job when result_code is 1", async () => {
+      // Mock responses with error result
+      const mockJobInfo = {
+        job_id: 12345,
+        html_url: "https://github.com/test-owner/test-repo/actions/runs/12345"
+      };
+      jest.spyOn(RunDiff.prototype, "getJobId").mockResolvedValue(mockJobInfo);
+
+      const errorSummary = "Error: Invalid configuration";
+      const mockDiffResult = {
+        result_code: "1" as const,
+        summary: errorSummary
+      };
+      jest.spyOn(RunDiff.prototype, "runDiff").mockResolvedValue(mockDiffResult);
+
+      const runDiff = new RunDiff();
+      await runDiff.run();
+
+      // Verify outputs were set
+      expect(core.setOutput).toHaveBeenCalledWith("job_id", mockJobInfo.job_id.toString());
+      expect(core.setOutput).toHaveBeenCalledWith("html_url", mockJobInfo.html_url);
+      expect(core.setOutput).toHaveBeenCalledWith("result_code", mockDiffResult.result_code);
+      expect(core.setOutput).toHaveBeenCalledWith("summary", mockDiffResult.summary);
+      expect(core.setOutput).toHaveBeenCalledWith("stack", mockInputs.stack);
+
+      // Verify job was failed with error summary
+      expect(core.setFailed).toHaveBeenCalledWith(errorSummary);
+    });
+
     it("should write output in correct format", async () => {
       // Mock successful responses
       const mockJobInfo = {

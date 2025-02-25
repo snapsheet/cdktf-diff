@@ -119,6 +119,10 @@ export class RunDiff {
     // Write outputs to file
     const outputPath = path.join(this.inputs.workingDirectory, this.inputs.outputFilename);
     fs.writeFileSync(outputPath, JSON.stringify(outputs));
+
+    if(result_code === "1") {
+      core.setFailed(summary);
+    }
   }
 
   /**
