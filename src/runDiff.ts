@@ -102,8 +102,6 @@ export class RunDiff {
     // Run the diff
     const { result_code, summary } = await this.runDiff();
 
-    console.log(`Summary of diff: ${summary}`);
-
     // Prepare outputs
     const outputs: ActionOutputs = {
       html_url,
@@ -178,7 +176,6 @@ export class RunDiff {
     }
     diffCommand += ` ${this.inputs.stack}`;
 
-    console.log(`Diff command before exec: ${diffCommand}`);
     try {
       let output = "";
       await exec.exec("bash", ["-c", diffCommand], {
