@@ -1,4 +1,4 @@
-/** @type {import('ts-jest/dist/types').InitialOptionsTsJest} */
+/** @type {import('ts-jest').JestConfigWithTsJest} */
 /*
  * For a detailed explanation regarding each configuration property, visit:
  * https://jestjs.io/docs/configuration
@@ -31,10 +31,16 @@ module.exports = {
   testEnvironment: "node",
 
   // The glob patterns Jest uses to detect test files
-  testMatch: ["**/__tests__/?(*.)+(spec|test).ts"],
+  testMatch: ["**/__tests__/**/*.test.ts"],
 
   // An array of regexp pattern strings that are matched against all test paths, matched tests are skipped
   testPathIgnorePatterns: ["/node_modules/", ".d.ts", ".js"],
 
-  setupFiles: ['<rootDir>/__tests__/setup.ts'],
+  // setupFiles: ['<rootDir>/__tests__/setup.ts'],
+
+  transform: {
+    "^.+\\.ts$": ["ts-jest", {
+      tsconfig: "tsconfig.test.json"
+    }]
+  }
 };

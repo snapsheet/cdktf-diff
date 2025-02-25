@@ -71,16 +71,16 @@ export class RunDiff {
   constructor() {
     // Get inputs first
     this.inputs = {
-      githubToken: core.getInput('github_token', { required: true }),
-      jobName: core.getInput('job_name', { required: true }),
-      outputFilename: core.getInput('output_filename', { required: true }),
-      ref: core.getInput('ref', { required: true }),
-      stack: core.getInput('stack', { required: true }),
-      stubOutputFile: core.getInput('stub_output_file'),
-      terraformVersion: core.getInput('terraform_version') || '1.8.0',
-      workingDirectory: core.getInput('working_directory') || './',
-      skipSynth: core.getBooleanInput('skip_synth'),
-      artifactName: core.getInput('artifact_name') ? Number(core.getInput('artifact_name')) : undefined,
+      githubToken: core.getInput("github_token", { required: true }),
+      jobName: core.getInput("job_name", { required: true }),
+      outputFilename: core.getInput("output_filename", { required: true }),
+      ref: core.getInput("ref", { required: true }),
+      stack: core.getInput("stack", { required: true }),
+      stubOutputFile: core.getInput("stub_output_file"),
+      terraformVersion: core.getInput("terraform_version") || "1.8.0",
+      workingDirectory: core.getInput("working_directory") || "./",
+      skipSynth: core.getBooleanInput("skip_synth"),
+      artifactName: core.getInput("artifact_name") ? Number(core.getInput("artifact_name")) : undefined,
     };
 
     // Then create octokit with the token
