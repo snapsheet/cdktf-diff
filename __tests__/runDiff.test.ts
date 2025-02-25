@@ -42,7 +42,7 @@ describe("RunDiff", () => {
     );
 
     // Setup github.context
-    (github.context as any) = {
+    (github.context as unknown) = {
       repo: { owner: "test-owner", repo: "test-repo" },
       runId: 12345
     };
@@ -308,6 +308,58 @@ describe("RunDiff", () => {
         ["-c", `CI=1 npx cdktf diff ${mockInputs.stack}`],
         expect.any(Object)
       );
+    });
+
+    it("should add skip-synth flag when input is true", async () => {
+      // Set skip-synth input to true
+      (core.getBooleanInput as jest.Mock).mockImplementation((name: string) => 
+        name === "skip_synth" ? true : mockInputs[name as keyof typeof mockInputs] === "true"
+      );
+
+      // Mock exec to simulate no changes output
+      (exec.exec as jest.Mock).mockImplementation((_cmd: string, _args: string[], opts?: { listeners?: { stdout?: (data: Buffer) => void } }) => {
+        if (opts?.listeners?.stdout) {
+          opts.listeners.stdout(Buffer.from("No changes"));
+        }
+        return Promise.resolve(0);
+      });
+
+      const runDiff = new RunDiff();
+      await runDiff.runDiff();
+
+      // Verify exec was called with skip-synth flag
+      expect(exec.exec).toHaveBeenCalledWith(
+        "bash",
+        ["-c", `CI=1 npx cdktf diff --skip-synth ${mockInputs.stack}`],
+        expect.any(Object)
+      );
+    });
+  });
+
+  describe("run", () => {
+    it("should write output in correct format", async () => {
+      // Mock successful responses
+      const mockJobInfo = {
+        job_id: 12345,
+        html_url: "https://github.com/test-owner/test-repo/actions/runs/12345"
+      };
+      jest.spyOn(RunDiff.prototype, "getJobId").mockResolvedValue(mockJobInfo);
+
+      const mockDiffResult = {
+        result_code: "2" as const,
+        summary: "Plan: 1 to add, 0 to change, 0 to destroy."
+      };
+      jest.spyOn(RunDiff.prototype, "runDiff").mockResolvedValue(mockDiffResult);
+
+      const runDiff = new RunDiff();
+      await runDiff.run();
+
+      // Verify outputs were set correctly
+      expect(core.setOutput).toHaveBeenCalledWith("job_id", mockJobInfo.job_id.toString());
+      expect(core.setOutput).toHaveBeenCalledWith("html_url", mockJobInfo.html_url);
+      expect(core.setOutput).toHaveBeenCalledWith("result_code", mockDiffResult.result_code);
+      expect(core.setOutput).toHaveBeenCalledWith("summary", mockDiffResult.summary);
+      expect(core.setOutput).toHaveBeenCalledWith("stack", mockInputs.stack);
     });
   });
 }); 
