@@ -3,6 +3,9 @@ defaults: &defaults
   docker:
     - image: cimg/node:20.11
 
+global_context: &global_context
+  context: org-global
+
 version: 2.1
 
 check_node_versions: &check_node_versions
@@ -36,7 +39,7 @@ jobs:
       - run: npm run test
 
 workflows:
-  version: 2
   test-workflow:
     jobs:
-      - test
+      - test:
+          <<: *global_context
