@@ -1,0 +1,42 @@
+defaults: &defaults
+  working_directory: ~/cdktf-diff
+  docker:
+    - image: cimg/node:20.11
+
+version: 2.1
+
+check_node_versions: &check_node_versions
+  run:
+    name: "Checking Versions"
+    command: |
+      node --version
+      npm --version
+
+node_restore_cache: &node_restore_cache
+  restore_cache:
+    keys:
+      - cdktf-diff-{{ checksum "package-lock.json" }}
+      - cdktf-diff-
+
+node_save_cache: &node_save_cache
+  save_cache:
+    paths:
+      - .npm
+    key: cdktf-diff-{{ checksum "package.json" }}
+
+jobs:
+  test:
+    <<: *defaults
+    steps:
+      - checkout
+      - <<: *check_node_versions
+      - <<: *node_restore_cache
+      - run: npm install
+      - <<: *node_save_cache
+      - run: npm run test
+
+workflows:
+  version: 2
+  test-workflow:
+    jobs:
+      - test
