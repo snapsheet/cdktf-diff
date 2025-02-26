@@ -3,6 +3,7 @@ import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as path from "path";
 import * as fs from "fs";
+import * as os from "os";
 import { Context } from "@actions/github/lib/context";
 import { Octokit } from "@octokit/core";
 import { PaginateInterface } from "@octokit/plugin-paginate-rest";
@@ -127,9 +128,7 @@ export class RunDiff {
 
   /**
    * Retrieves the job ID and HTML URL for the current workflow job.
-   * Supports pagination when querying the GitHub API.
    * 
-   * @param jobName - Name of the job to find
    * @returns Promise containing the job ID and HTML URL
    * @throws Error if the job cannot be found
    */
@@ -158,12 +157,11 @@ export class RunDiff {
    * Executes the CDKTF diff command and processes its output.
    * Supports both real execution and test mode with stub output.
    * 
-   * @param inputs - Validated action inputs
    * @returns Promise containing result code and summary
    * @throws Error if the diff execution fails unexpectedly
    */
   async runDiff(): Promise<{ result_code: ActionOutputs["result_code"]; summary: string }> {
-    const outputPath = path.join(process.env.TMPDIR || "/tmp", "cdktf-diff.txt");
+    const outputPath = path.join(os.tmpdir() || "/tmp", "cdktf-diff.txt");
     let diffCommand = this.inputs.stubOutputFile ? 
       `cat ${this.inputs.stubOutputFile}` :
       "CI=1 npx cdktf diff";
@@ -189,28 +187,39 @@ export class RunDiff {
 
       // Write output to file for parsing
       fs.writeFileSync(outputPath, output);
-      // eslint-disable-next-line no-control-regex
-      const cleanOutput = output.replace(/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]/g, "");
-
-      // Check for various output patterns and determine result
-      if (cleanOutput.includes("Planning failed. Terraform encountered an error")) {
-        const summary = cleanOutput.match(/Error: .*/)?.[0] || "Unknown error occurred";
-        return { result_code: "1", summary };
-      }
-
-      if (cleanOutput.includes("No changes. Your infrastructure matches the configuration.")) {
-        return { result_code: "0", summary: "No changes. Your infrastructure matches the configuration." };
-      }
-
-      const planMatch = cleanOutput.match(/Plan:.*/);
-      if (planMatch) {
-        return { result_code: "2", summary: planMatch[0] };
-      }
-
-      throw new Error("Could not determine if diff ran successfully");
+      
+      return this.parseOutput(output);
     } catch (error) {
       return { result_code: "1", summary: (error as Error).message };
     }
   }
 
+  /**
+   * Parses the output from CDKTF diff command and determines the result.
+   * 
+   * @param output - Raw output from the diff command
+   * @returns Object containing result code and summary
+   * @throws Error if the output cannot be parsed
+   */
+  private parseOutput(output: string): { result_code: ActionOutputs["result_code"]; summary: string } {
+    // eslint-disable-next-line no-control-regex
+    const cleanOutput = output.replace(/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]/g, "");
+
+    // Check for various output patterns and determine result
+    if (cleanOutput.includes("Planning failed. Terraform encountered an error")) {
+      const summary = cleanOutput.match(/Error: .*/)?.[0] || "Unknown error occurred";
+      return { result_code: "1", summary };
+    }
+
+    if (cleanOutput.includes("No changes. Your infrastructure matches the configuration.")) {
+      return { result_code: "0", summary: "No changes. Your infrastructure matches the configuration." };
+    }
+
+    const planMatch = cleanOutput.match(/Plan:.*/);
+    if (planMatch) {
+      return { result_code: "2", summary: planMatch[0] };
+    }
+
+    throw new Error("Could not determine if diff ran successfully");
+  }
 }

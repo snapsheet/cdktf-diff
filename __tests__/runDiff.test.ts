@@ -61,20 +61,18 @@ describe("RunDiff", () => {
       };
 
       // Create mock paginated response
-      const mockJobs = {
-        jobs: [
-          ...Array(250).fill(null).map(() => ({
-            id: faker.number.int({ min: 1000, max: 9999 }),
-            name: "other-job",
-            html_url: faker.internet.url(),
-            status: "completed",
-            conclusion: "success",
-            started_at: faker.date.recent().toISOString(),
-            completed_at: faker.date.recent().toISOString()
-          })),
-          targetJob
-        ]
-      };
+      const mockJobs = [
+        ...Array(250).fill(null).map(() => ({
+          id: faker.number.int({ min: 1000, max: 9999 }),
+          name: "other-job",
+          html_url: faker.internet.url(),
+          status: "completed",
+          conclusion: "success",
+          started_at: faker.date.recent().toISOString(),
+          completed_at: faker.date.recent().toISOString()
+        })),
+        targetJob
+      ];
 
       // Mock Octokit paginate to return all jobs
       const mockPaginate = jest.fn().mockResolvedValue(mockJobs);
@@ -111,17 +109,15 @@ describe("RunDiff", () => {
 
     it("should throw error when job is not found after pagination", async () => {
       // Create mock paginated response with no matching job
-      const mockJobs = {
-        jobs: Array(50).fill(null).map(() => ({
-          id: faker.number.int({ min: 1000, max: 9999 }),
-          name: "different-job",
-          html_url: faker.internet.url(),
-          status: "completed",
-          conclusion: "success",
-          started_at: faker.date.recent().toISOString(),
-          completed_at: faker.date.recent().toISOString()
-        }))
-      };
+      const mockJobs = Array(50).fill(null).map(() => ({
+        id: faker.number.int({ min: 1000, max: 9999 }),
+        name: "different-job",
+        html_url: faker.internet.url(),
+        status: "completed",
+        conclusion: "success",
+        started_at: faker.date.recent().toISOString(),
+        completed_at: faker.date.recent().toISOString()
+      }));
 
       // Mock Octokit to return a single page with no matching job
       const mockPaginate = jest.fn().mockResolvedValue(mockJobs);
