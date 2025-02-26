@@ -3,6 +3,8 @@ import * as core from "@actions/core";
 import * as github from "@actions/github";
 import { faker } from "@faker-js/faker";
 import * as exec from "@actions/exec";
+import * as fs from "fs";
+import * as path from "path";
 
 // Mock all external dependencies
 jest.mock("@actions/core", () => ({
@@ -46,6 +48,19 @@ describe("RunDiff", () => {
       repo: { owner: "test-owner", repo: "test-repo" },
       runId: 12345
     };
+  });
+
+  // Clean up after all tests
+  afterAll(() => {
+    const outputPath = path.join(mockInputs.working_directory, mockInputs.output_filename);
+    try {
+      fs.unlinkSync(outputPath);
+    } catch (error) {
+      // File might not exist, which is fine
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+        console.error(`Error cleaning up test file: ${error}`);
+      }
+    }
   });
 
   describe("getJobId", () => {
