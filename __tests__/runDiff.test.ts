@@ -33,7 +33,7 @@ describe("RunDiff", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     
-    // Setup core.getInput mock
+    // `Setup` core.getInput mock
     (core.getInput as jest.Mock).mockImplementation((name: string) => 
       mockInputs[name as keyof typeof mockInputs]
     );
@@ -50,35 +50,6 @@ describe("RunDiff", () => {
 
   describe("getJobId", () => {
     it("should find job ID on third page of results", async () => {
-      // Create mock responses for three pages
-      const page1 = {
-        data: {
-          jobs: Array(100).fill(null).map(() => ({
-            id: faker.number.int({ min: 1000, max: 9999 }),
-            name: "other-job",
-            html_url: faker.internet.url(),
-            status: "completed",
-            conclusion: "success",
-            started_at: faker.date.recent().toISOString(),
-            completed_at: faker.date.recent().toISOString()
-          }))
-        }
-      };
-
-      const page2 = {
-        data: {
-          jobs: Array(100).fill(null).map(() => ({
-            id: faker.number.int({ min: 1000, max: 9999 }),
-            name: "another-job",
-            html_url: faker.internet.url(),
-            status: "completed",
-            conclusion: "success",
-            started_at: faker.date.recent().toISOString(),
-            completed_at: faker.date.recent().toISOString()
-          }))
-        }
-      };
-
       const targetJob = {
         id: 12345,
         name: "target-job",
@@ -89,44 +60,30 @@ describe("RunDiff", () => {
         completed_at: faker.date.recent().toISOString()
       };
 
-      const page3 = {
-        data: {
-          jobs: [
-            ...Array(50).fill(null).map(() => ({
-              id: faker.number.int({ min: 1000, max: 9999 }),
-              name: "different-job",
-              html_url: faker.internet.url(),
-              status: "completed",
-              conclusion: "success",
-              started_at: faker.date.recent().toISOString(),
-              completed_at: faker.date.recent().toISOString()
-            })),
-            targetJob
-          ]
-        }
+      // Create mock paginated response
+      const mockJobs = {
+        jobs: [
+          ...Array(250).fill(null).map(() => ({
+            id: faker.number.int({ min: 1000, max: 9999 }),
+            name: "other-job",
+            html_url: faker.internet.url(),
+            status: "completed",
+            conclusion: "success",
+            started_at: faker.date.recent().toISOString(),
+            completed_at: faker.date.recent().toISOString()
+          })),
+          targetJob
+        ]
       };
 
-      // Mock Octokit to return different responses based on page number
-      let currentPage = 1;
-      const mockListJobs = jest.fn().mockImplementation(() => {
-        switch(currentPage) {
-          case 1:
-            currentPage++;
-            return Promise.resolve(page1);
-          case 2:
-            currentPage++;
-            return Promise.resolve(page2);
-          case 3:
-            return Promise.resolve(page3);
-          default:
-            return Promise.resolve({ data: { jobs: [] } });
-        }
-      });
+      // Mock Octokit paginate to return all jobs
+      const mockPaginate = jest.fn().mockResolvedValue(mockJobs);
 
       (github.getOctokit as jest.Mock).mockReturnValue({
+        paginate: mockPaginate,
         rest: {
           actions: {
-            listJobsForWorkflowRun: mockListJobs
+            listJobsForWorkflowRun: jest.fn()
           }
         }
       });
@@ -140,40 +97,40 @@ describe("RunDiff", () => {
         html_url: targetJob.html_url
       });
 
-      // Verify pagination was handled correctly
-      expect(mockListJobs).toHaveBeenCalledTimes(3);
-      expect(mockListJobs).toHaveBeenCalledWith({
-        owner: "test-owner",
-        repo: "test-repo",
-        run_id: 12345,
-        per_page: 100,
-        page: 1
-      });
+      // Verify paginate was called correctly
+      expect(mockPaginate).toHaveBeenCalledTimes(1);
+      expect(mockPaginate).toHaveBeenCalledWith(
+        expect.any(Function),
+        {
+          owner: "test-owner",
+          repo: "test-repo",
+          run_id: 12345
+        }
+      );
     });
 
     it("should throw error when job is not found after pagination", async () => {
-      // Create mock responses with jobs that don't match our target name
-      const mockPage = {
-        data: {
-          jobs: Array(50).fill(null).map(() => ({
-            id: faker.number.int({ min: 1000, max: 9999 }),
-            name: "different-job",
-            html_url: faker.internet.url(),
-            status: "completed",
-            conclusion: "success",
-            started_at: faker.date.recent().toISOString(),
-            completed_at: faker.date.recent().toISOString()
-          }))
-        }
+      // Create mock paginated response with no matching job
+      const mockJobs = {
+        jobs: Array(50).fill(null).map(() => ({
+          id: faker.number.int({ min: 1000, max: 9999 }),
+          name: "different-job",
+          html_url: faker.internet.url(),
+          status: "completed",
+          conclusion: "success",
+          started_at: faker.date.recent().toISOString(),
+          completed_at: faker.date.recent().toISOString()
+        }))
       };
 
       // Mock Octokit to return a single page with no matching job
-      const mockListJobs = jest.fn().mockResolvedValue(mockPage);
+      const mockPaginate = jest.fn().mockResolvedValue(mockJobs);
 
       (github.getOctokit as jest.Mock).mockReturnValue({
+        paginate: mockPaginate,
         rest: {
           actions: {
-            listJobsForWorkflowRun: mockListJobs
+            listJobsForWorkflowRun: jest.fn()
           }
         }
       });
@@ -185,15 +142,16 @@ describe("RunDiff", () => {
         `Could not find job with name ${mockInputs.job_name}`
       );
 
-      // Verify that only one page was queried before giving up
-      expect(mockListJobs).toHaveBeenCalledTimes(1);
-      expect(mockListJobs).toHaveBeenCalledWith({
-        owner: "test-owner",
-        repo: "test-repo",
-        run_id: 12345,
-        per_page: 100,
-        page: 1
-      });
+      // Verify paginate was called correctly
+      expect(mockPaginate).toHaveBeenCalledTimes(1);
+      expect(mockPaginate).toHaveBeenCalledWith(
+        expect.any(Function),
+        {
+          owner: "test-owner",
+          repo: "test-repo",
+          run_id: 12345
+        }
+      );
     });
   });
 

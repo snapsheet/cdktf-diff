@@ -142,7 +142,8 @@ export class RunDiff {
       }
     );
 
-    const job = octokitPaginatedJobs.jobs.find(j => j.name === this.inputs.jobName);
+    const job = octokitPaginatedJobs.find(j => j.name === this.inputs.jobName);
+
     if (job) {
       return {
         job_id: job.id,

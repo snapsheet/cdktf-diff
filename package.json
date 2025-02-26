@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "author": "@snapsheet",
   "private": true,
-  "description": "GitHub Action to execute cdktf diff and parse outputs",
+  "description": "Execute cdktf diff, parse STDOUT/STDERR output, and return outputs based on the outcomes",
   "exports": {
     ".": "./dist/index.js"
   },
