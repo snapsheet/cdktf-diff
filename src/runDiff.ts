@@ -13,26 +13,26 @@ import { Api } from "@octokit/plugin-rest-endpoint-methods/dist-types/types";
  * These inputs are defined in action.yml and can be provided when using the action.
  */
 interface ActionInputs {
-  /** GitHub token for API access */
+  /** GITHUB_TOKEN to use GitHub API. Simply specify secrets.GITHUB_TOKEN. */
   githubToken: string;
-  /** Name of the workflow job */
+  /** jobs.<job-id>.name of this workflow job. This is needed to get the job ID via query. */
   jobName: string;
-  /** Name of the file to save results into */
+  /** Name of the file this jobs outputs will be saved into. */
   outputFilename: string;
-  /** Git ref to diff against */
+  /** The ref (branch or sha) to use with the diff. */
   ref: string;
-  /** Name of the CDKTF stack to diff */
+  /** Full name of the CDKTF stack to diff. */
   stack: string;
-  /** Optional file containing mock output for testing */
+  /** When present, no Terraform will execute. The output of this action will be substituted with the output contained in this file. This is useful for cases when you want to test but don't have authentication set up. */
   stubOutputFile?: string;
-  /** Version of Terraform to use */
+  /** The version of Terraform to use (defaults to 1.8.0) */
   terraformVersion: string;
-  /** Directory containing CDKTF code */
+  /** Working directory where CDKTF code is located */
   workingDirectory: string;
-  /** Whether to skip synthesis step */
+  /** Skip synthesis of the application, assume the synthesized Terraform code is already present and up to date */
   skipSynth: boolean;
-  /** Optional artifact to download */
-  artifactName?: number;
+  /** When given, attempt to download the given artifact contents into this working directory. */
+  artifactName?: string;
 }
 
 /**
@@ -58,7 +58,8 @@ interface ActionOutputs {
 }
 
 /**
- * Consolidate the output of all jobs that came prior to this job and return as the output of this job.
+ * Executes CDKTF diff command, parses the output, and provides structured results.
+ * Handles different output patterns to determine if there are changes, errors, or no changes.
  */
 export class RunDiff {
   octokit: Octokit & Api & { paginate: PaginateInterface };
@@ -80,7 +81,7 @@ export class RunDiff {
       terraformVersion: core.getInput("terraform_version") || "1.8.0",
       workingDirectory: core.getInput("working_directory") || "./",
       skipSynth: core.getBooleanInput("skip_synth"),
-      artifactName: core.getInput("artifact_name") ? Number(core.getInput("artifact_name")) : undefined,
+      artifactName: core.getInput("artifact_name"),
     };
 
     // Then create octokit with the token
@@ -91,9 +92,8 @@ export class RunDiff {
   }
 
   /**
-   * Runtime entrypoint. Query for the last successful ran (not reran) jobs prior to this job and
-   * return the content of the outputs JSON as an output of this job. Outputs of this job will have
-   * the same key/name as the strings defined in the `needs` configuration.
+   * Main execution method. Gets the job ID, runs the CDKTF diff, and processes the results.
+   * Sets action outputs and writes results to a file. Fails the action if errors are detected.
    */
   async run() {
     // Get job information
@@ -134,30 +134,22 @@ export class RunDiff {
    * @throws Error if the job cannot be found
    */
   async getJobId(): Promise<{ job_id: number; html_url: string }> {
-    let page = 1;
-
-    // eslint-disable-next-line no-constant-condition
-    while (true) {
-      const response = await this.octokit.rest.actions.listJobsForWorkflowRun({
+    const octokitPaginatedJobs = await this.octokit.paginate(
+      this.octokit.rest.actions.listJobsForWorkflowRun,
+      {
         ...github.context.repo,
-        run_id: github.context.runId,
-        per_page: 100,
-        page
-      });
-
-      const job = response.data.jobs.find(j => j.name === this.inputs.jobName);
-      if (job) {
-        return {
-          job_id: job.id,
-          html_url: job.html_url || ""
-        };
+        run_id: github.context.runId
       }
+    );
 
-      if (response.data.jobs.length < 100) {
-        throw new Error(`Could not find job with name ${this.inputs.jobName}`);
-      }
-
-      page++;
+    const job = octokitPaginatedJobs.jobs.find(j => j.name === this.inputs.jobName);
+    if (job) {
+      return {
+        job_id: job.id,
+        html_url: job.html_url || ""
+      };
+    } else {
+      throw new Error(`Could not find job with name ${this.inputs.jobName}`);
     }
   }
 
