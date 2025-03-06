@@ -63,7 +63,7 @@ describe("RunDiff", () => {
     }
   });
 
-  describe("getJobId", () => {
+  describe("getJobInformation", () => {
     it("should find job ID on third page of results", async () => {
       const targetJob = {
         id: 12345,
@@ -102,7 +102,7 @@ describe("RunDiff", () => {
       });
 
       const runDiff = new RunDiff();
-      const result = await runDiff.getJobId();
+      const result = await runDiff.getJobInformation();
 
       // Verify the correct job was found
       expect(result).toEqual({
@@ -148,8 +148,8 @@ describe("RunDiff", () => {
 
       const runDiff = new RunDiff();
       
-      // Verify that getJobId throws with the correct error message
-      await expect(runDiff.getJobId()).rejects.toThrow(
+      // Verify that getJobInformation throws with the correct error message
+      await expect(runDiff.getJobInformation()).rejects.toThrow(
         `Could not find job with name ${mockInputs.job_name}`
       );
 
@@ -334,7 +334,7 @@ describe("RunDiff", () => {
         job_id: 12345,
         html_url: "https://github.com/test-owner/test-repo/actions/runs/12345"
       };
-      jest.spyOn(RunDiff.prototype, "getJobId").mockResolvedValue(mockJobInfo);
+      jest.spyOn(RunDiff.prototype, "getJobInformation").mockResolvedValue(mockJobInfo);
 
       const errorSummary = "Error: Invalid configuration";
       const mockDiffResult = {
@@ -363,7 +363,7 @@ describe("RunDiff", () => {
         job_id: 12345,
         html_url: "https://github.com/test-owner/test-repo/actions/runs/12345"
       };
-      jest.spyOn(RunDiff.prototype, "getJobId").mockResolvedValue(mockJobInfo);
+      jest.spyOn(RunDiff.prototype, "getJobInformation").mockResolvedValue(mockJobInfo);
 
       const mockDiffResult = {
         result_code: "2" as const,

@@ -98,7 +98,7 @@ export class RunDiff {
    */
   async run() {
     // Get job information
-    const { job_id, html_url } = await this.getJobId();
+    const { job_id, html_url } = await this.getJobInformation();
 
     // Run the diff
     const { result_code, summary } = await this.runDiff();
@@ -132,7 +132,7 @@ export class RunDiff {
    * @returns Promise containing the job ID and HTML URL
    * @throws Error if the job cannot be found
    */
-  async getJobId(): Promise<{ job_id: number; html_url: string }> {
+  async getJobInformation(): Promise<{ job_id: number; html_url: string }> {
     const octokitPaginatedJobs = await this.octokit.paginate(
       this.octokit.rest.actions.listJobsForWorkflowRun,
       {
@@ -162,18 +162,13 @@ export class RunDiff {
    */
   async runDiff(): Promise<{ result_code: ActionOutputs["result_code"]; summary: string }> {
     const outputPath = path.join(os.tmpdir() || "/tmp", "cdktf-diff.txt");
-    let diffCommand = this.inputs.stubOutputFile ? 
-      `cat ${this.inputs.stubOutputFile}` :
-      "CI=1 npx cdktf diff";
-
-    if (this.inputs.skipSynth) {
-      diffCommand += " --skip-synth";
-    }
-    diffCommand += ` ${this.inputs.stack}`;
+    const diffCommand = [this.inputs.stubOutputFile ? `cat ${this.inputs.stubOutputFile}` : "CI=1 npx cdktf diff"];
+    if (this.inputs.skipSynth) diffCommand.push("--skip-synth");
+    diffCommand.push(this.inputs.stack);
 
     try {
       let output = "";
-      await exec.exec("bash", ["-c", diffCommand], {
+      await exec.exec("bash", ["-c", diffCommand.join(" ")], {
         listeners: {
           stdout: (data: Buffer) => {
             output += data.toString();
