@@ -88,8 +88,7 @@ export class RunDiff {
     // Then create octokit with the token
     this.octokit = github.getOctokit(this.inputs.githubToken);
     this.context = github.context;
-    core.debug("Context:");
-    core.debug(JSON.stringify(this.context));
+    core.debug(`Context:\n${JSON.stringify(this.context)}`);
   }
 
   /**
