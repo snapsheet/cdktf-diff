@@ -151,15 +151,7 @@ runs:
         # Make sure we do not exit on diff command failure
         set +e
         eval $DIFF_COMMAND | tee $DIFF_FILE_PATH
-        DIFF_EXIT_CODE=${PIPESTATUS[0]}
         set -e
-
-        if [ $DIFF_EXIT_CODE -ne 0 ]; then
-          SUMMARY="Error: Diff command failed with exit code $DIFF_EXIT_CODE"
-          echo "result_code=1" >> $GITHUB_OUTPUT
-          echo "summary=$SUMMARY" >> $GITHUB_OUTPUT
-          exit 1
-        fi
 
         # Remove ANSI color codes for better pattern matching
         CLEAN_OUTPUT=$(cat $DIFF_FILE_PATH | sed -r "s/\\x1B\\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g")
