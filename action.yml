@@ -148,8 +148,11 @@ runs:
 
         # show output in CLI/GitHub and also send to file for later parsing
         DIFF_FILE_PATH="${TMPDIR}cdktf-diff.txt"
+        # Make sure we do not exit on diff command failure
+        set +e
         eval $DIFF_COMMAND | tee $DIFF_FILE_PATH
         DIFF_EXIT_CODE=${PIPESTATUS[0]}
+        set -e
 
         if [ $DIFF_EXIT_CODE -ne 0 ]; then
           SUMMARY="Error: Diff command failed with exit code $DIFF_EXIT_CODE"
