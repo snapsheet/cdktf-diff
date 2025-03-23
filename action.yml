@@ -164,7 +164,7 @@ runs:
         # If planning failed due to an error, set the outputs and return.
         if echo $CLEAN_OUTPUT | grep "Planning failed. Terraform encountered an error while generating this plan." > /dev/null ; then
           echo "result_code=1" >> $GITHUB_OUTPUT
-          SUMMARY=$(echo $CLEAN_OUTPUT | grep "Error: " | head -1")
+          SUMMARY=$(echo $CLEAN_OUTPUT | grep "Error: " | head -1)
           echo "summary=$SUMMARY" >> $GITHUB_OUTPUT
           exit 1
         fi
