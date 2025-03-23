@@ -194,7 +194,7 @@ runs:
       if: ${{ always() }}
       shell: bash
       run: |
-        TOTAL_OUTPUTS='{"result_code":${{ steps.diff.outputs.result_code }},"summary":"${{ steps.diff.outputs.summary }}","html_url":"${{ steps.jobid_action.outputs.html_url }}","stack":"${{ inputs.stack }}","job_id":"${{ steps.jobid_action.outputs.job_id }}","node_version":"${{ steps.configurations.outputs.node_version }}","terraform_version":"${{ inputs.terraform_version }}"}'
+        TOTAL_OUTPUTS='{"result_code":"${{ steps.diff.outputs.result_code }}","summary":"${{ steps.diff.outputs.summary }}","html_url":"${{ steps.jobid_action.outputs.html_url }}","stack":"${{ inputs.stack }}","job_id":"${{ steps.jobid_action.outputs.job_id }}","node_version":"${{ steps.configurations.outputs.node_version }}","terraform_version":"${{ inputs.terraform_version }}"}'
         echo $TOTAL_OUTPUTS > ${{ inputs.working_directory }}/${{ inputs.output_filename }}
 
     - uses: actions/upload-artifact@v4
