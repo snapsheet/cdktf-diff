@@ -122,6 +122,28 @@ describe("RunDiff", () => {
       );
     });
 
+    it("should throw an error if the workflow run cannot be found (octokit.paginate rejects)", async () => {
+      // Mock Octokit paginate to reject (simulate API failure, e.g., 404)
+      const mockPaginate = jest.fn().mockRejectedValue(new Error("Not Found"));
+
+      (github.getOctokit as jest.Mock).mockReturnValue({
+        paginate: mockPaginate,
+        rest: {
+          actions: {
+            listJobsForWorkflowRun: jest.fn()
+          }
+        }
+      });
+
+      const runDiff = new RunDiff();
+
+      // Assert that getJobInformation throws the error from the API
+      await expect(runDiff.getJobInformation()).rejects.toThrow("Not Found");
+
+      // Optionally, verify paginate was called
+      expect(mockPaginate).toHaveBeenCalledTimes(1);
+    });
+
     it("should throw error when job is not found after pagination", async () => {
       // Create mock paginated response with no matching job
       const mockJobs = Array(50).fill(null).map(() => ({
@@ -303,6 +325,43 @@ describe("RunDiff", () => {
         expect.any(Object)
       );
     });
+
+    it("should use 'cat <stub_output_file>' instead of cdktf diff when runDiff with stub_output_file", async () => {
+      const stubFile = "stub-output.txt";
+      // Patch getInput to return stub_output_file for the right key
+      (core.getInput as jest.Mock).mockImplementation((name: string) => {
+        if (name === "stub_output_file") return stubFile;
+        return mockInputs[name as keyof typeof mockInputs];
+      });
+      (core.getBooleanInput as jest.Mock).mockImplementation((name: string) =>
+        mockInputs[name as keyof typeof mockInputs] === "true"
+      );
+
+      let calledCommand = "";
+      let calledArgs: string[] = [];
+      (exec.exec as jest.Mock).mockImplementation((cmd: string, args: string[], opts?: any) => {
+        calledCommand = cmd;
+        calledArgs = args;
+        if (opts?.listeners?.stdout) {
+          opts.listeners.stdout(Buffer.from("No changes. Your infrastructure matches the configuration."));
+        }
+        return Promise.resolve(0);
+      });
+
+      const runDiff = new RunDiff();
+      const result = await runDiff.runDiff();
+
+      // Should use 'cat <stub_output_file>' and not 'cdktf diff'
+      expect(calledCommand).toBe("bash");
+      expect(calledArgs[0]).toBe("-c");
+      expect(calledArgs[1]).toContain(`cat ${stubFile}`);
+      expect(calledArgs[1]).not.toContain("cdktf diff");
+      expect(result).toEqual({
+        result_code: "0",
+        summary: "No changes. Your infrastructure matches the configuration."
+      });
+    });
+
 
     it("should capture both stdout and stderr output", async () => {
       // Mock exec to simulate output to both streams
