@@ -162,7 +162,7 @@ runs:
         if [ ! -f "$DIFF_FILE_PATH" ] || [ ! -s "$DIFF_FILE_PATH" ]; then
           echo "result_code=1" >> $GITHUB_OUTPUT
           echo "summary=Error: Diff command failed before producing output" >> $GITHUB_OUTPUT
-          exit 0 # exit with 0 so subsequent steps can run
+          exit 1
         fi
 
         # If planning failed due to an error, set the outputs and return.
@@ -173,7 +173,7 @@ runs:
             SUMMARY="Planning failed. Terraform encountered an error while generating this plan."
           fi
           echo "summary=$SUMMARY" >> $GITHUB_OUTPUT
-          exit 0 # return code zero so we don't break the rest of the workflow
+          exit 1
         fi        
 
         # If there are no changes, set the outputs and return.
@@ -208,13 +208,13 @@ runs:
               echo "summary=Error: Diff command failed with exit code $DIFF_EXIT_CODE" >> $GITHUB_OUTPUT
             fi
           fi
-          exit 0 # exit with 0 so subsequent steps can run
+          exit $DIFF_EXIT_CODE
         fi
 
         # If we get here, we couldn't determine the result
         echo "result_code=1" >> $GITHUB_OUTPUT
         echo "summary=Error: Could not determine if diff ran successfully" >> $GITHUB_OUTPUT
-        exit 0 # exit with 0 so subsequent steps can run
+        exit 1
 
     - name: Dump Outputs to File
       if: always()
