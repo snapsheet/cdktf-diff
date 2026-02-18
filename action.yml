@@ -168,7 +168,7 @@ runs:
         # If planning failed due to an error, set the outputs and return.
         if cat $DIFF_FILE_PATH | sed -r "s/\\x1B\\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" | grep "Planning failed. Terraform encountered an error while generating this plan." > /dev/null ; then
           echo "result_code=1" >> $GITHUB_OUTPUT
-          SUMMARY=$(cat $DIFF_FILE_PATH | grep "Error: " | head -1 | sed -r "s/\\x1B\\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" | sed 's/^[[:space:]]*│[[:space:]]*//' | xargs)
+          SUMMARY=$(cat $DIFF_FILE_PATH | grep "Error: " | head -1 | sed -r "s/\\x1B\\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" | sed 's/^[[:space:]]*│[[:space:]]*//' | sed -r 's/^::(error|warning|notice|debug):: *//' | xargs)
           if [ -z "$SUMMARY" ]; then
             SUMMARY="Planning failed. Terraform encountered an error while generating this plan."
           fi
@@ -196,12 +196,12 @@ runs:
         if [ $DIFF_EXIT_CODE -ne 0 ]; then
           echo "result_code=1" >> $GITHUB_OUTPUT
           # Try to extract error message from the output
-          ERROR_MSG=$(cat $DIFF_FILE_PATH | grep -i "Error:" | head -1 | sed -r "s/\\x1B\\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" | sed 's/^[[:space:]]*│[[:space:]]*//' | xargs || true)
+          ERROR_MSG=$(cat $DIFF_FILE_PATH | grep -i "Error:" | head -1 | sed -r "s/\\x1B\\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" | sed 's/^[[:space:]]*│[[:space:]]*//' | sed -r 's/^::(error|warning|notice|debug):: *//' | xargs || true)
           if [ -n "$ERROR_MSG" ]; then
             echo "summary=$ERROR_MSG" >> $GITHUB_OUTPUT
           else
             # Fallback: get last few lines that might contain error info
-            ERROR_MSG=$(tail -5 $DIFF_FILE_PATH | sed -r "s/\\x1B\\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" | sed 's/^[[:space:]]*│[[:space:]]*//' | tr '\n' ' ' | xargs || true)
+            ERROR_MSG=$(tail -5 $DIFF_FILE_PATH | sed -r "s/\\x1B\\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" | sed 's/^[[:space:]]*│[[:space:]]*//' | sed -r 's/^::(error|warning|notice|debug):: *//' | tr '\n' ' ' | xargs || true)
             if [ -n "$ERROR_MSG" ]; then
               echo "summary=$ERROR_MSG" >> $GITHUB_OUTPUT
             else
