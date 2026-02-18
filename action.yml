@@ -184,8 +184,8 @@ runs:
           exit 0
         fi
 
-        # If there is a plan, set the outputs and return.
-        if cat $DIFF_FILE_PATH | sed -r "s/\\x1B\\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" | grep "Plan:" > /dev/null ; then
+        # If there is a plan and the command succeeded, set the outputs and return.
+        if cat $DIFF_FILE_PATH | sed -r "s/\\x1B\\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" | grep "Plan:" > /dev/null && [ $DIFF_EXIT_CODE -eq 0 ]; then
           echo "result_code=2" >> $GITHUB_OUTPUT
           SUMMARY=$(cat $DIFF_FILE_PATH | grep "Plan:" | sed -r "s/\\x1B\\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g" | sed 's/.*Plan:/Plan:/' | xargs)
           echo "summary=$SUMMARY" >> $GITHUB_OUTPUT
@@ -236,6 +236,10 @@ runs:
         if [ -z "$SUMMARY" ]; then
           SUMMARY="Error: Job failed before outputs could be determined"
         fi
+
+        # Strip GitHub Actions log prefix if present
+        SUMMARY=$(echo "$SUMMARY" | sed -r 's/^::(error|warning|notice|debug):: *//')
+
         if [ -z "$HTML_URL" ]; then
           HTML_URL=""
         fi
