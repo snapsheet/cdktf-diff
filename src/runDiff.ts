@@ -45,7 +45,7 @@ interface ActionOutputs {
   html_url: string;
   /** ID of the executed job */
   job_id: string;
-  /** 
+  /**
    * Result code indicating the outcome:
    * - '0': Success with no changes
    * - '1': Error occurred
@@ -108,7 +108,7 @@ export class RunDiff {
       job_id: job_id.toString(),
       result_code,
       stack: this.inputs.stack,
-      summary
+      summary,
     };
 
     // Set action outputs
@@ -117,17 +117,20 @@ export class RunDiff {
     });
 
     // Write outputs to file
-    const outputPath = path.join(this.inputs.workingDirectory, this.inputs.outputFilename);
+    const outputPath = path.join(
+      this.inputs.workingDirectory,
+      this.inputs.outputFilename,
+    );
     fs.writeFileSync(outputPath, JSON.stringify(outputs));
 
-    if(result_code === "1") {
+    if (result_code === "1") {
       core.setFailed(summary);
     }
   }
 
   /**
    * Retrieves the job ID and HTML URL for the current workflow job.
-   * 
+   *
    * @returns Promise containing the job ID and HTML URL
    * @throws Error if the job cannot be found
    */
@@ -136,16 +139,18 @@ export class RunDiff {
       this.octokit.rest.actions.listJobsForWorkflowRun,
       {
         ...github.context.repo,
-        run_id: github.context.runId
-      }
+        run_id: github.context.runId,
+      },
     );
 
-    const job = octokitPaginatedJobs.find(j => j.name === this.inputs.jobName);
+    const job = octokitPaginatedJobs.find(
+      (j) => j.name === this.inputs.jobName,
+    );
 
     if (job) {
       return {
         job_id: job.id,
-        html_url: job.html_url || ""
+        html_url: job.html_url || "",
       };
     } else {
       throw new Error(`Could not find job with name ${this.inputs.jobName}`);
@@ -155,34 +160,42 @@ export class RunDiff {
   /**
    * Executes the CDKTF diff command and processes its output.
    * Supports both real execution and test mode with stub output.
-   * 
+   *
    * @returns Promise containing result code and summary
    * @throws Error if the diff execution fails unexpectedly
    */
-  async runDiff(): Promise<{ result_code: ActionOutputs["result_code"]; summary: string }> {
+  async runDiff(): Promise<{
+    result_code: ActionOutputs["result_code"];
+    summary: string;
+  }> {
     const outputPath = path.join(os.tmpdir() || "/tmp", "cdktf-diff.txt");
-    const diffCommand = [this.inputs.stubOutputFile ? `cat ${this.inputs.stubOutputFile}` : "CI=1 npx cdktf diff"];
+    const diffCommand = [
+      this.inputs.stubOutputFile
+        ? `cat ${this.inputs.stubOutputFile}`
+        : "CI=1 npx cdktf diff",
+    ];
     if (this.inputs.skipSynth) diffCommand.push("--skip-synth");
     diffCommand.push(this.inputs.stack);
 
     try {
       let output = "";
-      await exec.exec("bash", ["-c", diffCommand.join(" ")], {
+      const exitCode = await exec.exec("bash", ["-c", diffCommand.join(" ")], {
+        ignoreReturnCode: true,
         listeners: {
           stdout: (data: Buffer) => {
             output += data.toString();
           },
           stderr: (data: Buffer) => {
             output += data.toString();
-          }
+          },
         },
-        cwd: this.inputs.workingDirectory
+        cwd: this.inputs.workingDirectory,
       });
 
       // Write output to file for parsing
       fs.writeFileSync(outputPath, output);
-      
-      return this.parseOutput(output);
+
+      return this.parseOutput(output, exitCode);
     } catch (error) {
       return { result_code: "1", summary: (error as Error).message };
     }
@@ -190,23 +203,52 @@ export class RunDiff {
 
   /**
    * Parses the output from CDKTF diff command and determines the result.
-   * 
+   *
    * @param output - Raw output from the diff command
+   * @param exitCode - Exit code from the diff command
    * @returns Object containing result code and summary
    * @throws Error if the output cannot be parsed
    */
-  private parseOutput(output: string): { result_code: ActionOutputs["result_code"]; summary: string } {
+  private parseOutput(
+    output: string,
+    exitCode: number,
+  ): {
+    result_code: ActionOutputs["result_code"];
+    summary: string;
+  } {
     // eslint-disable-next-line no-control-regex
-    const cleanOutput = output.replace(/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]/g, "");
+    const cleanOutput = output.replace(
+      /\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]/g,
+      "",
+    );
 
-    // Check for various output patterns and determine result
-    if (cleanOutput.includes("Planning failed. Terraform encountered an error")) {
-      const summary = cleanOutput.match(/Error: .*/)?.[0] || "Unknown error occurred";
-      return { result_code: "1", summary };
+    if (exitCode !== 0) {
+      return {
+        result_code: "1",
+        summary: `Plan failed with exit code ${exitCode}. See run for details.`,
+      };
     }
 
-    if (cleanOutput.includes("No changes. Your infrastructure matches the configuration.")) {
-      return { result_code: "0", summary: "No changes. Your infrastructure matches the configuration." };
+    if (
+      cleanOutput.includes(
+        "No changes. Your infrastructure matches the configuration.",
+      )
+    ) {
+      return {
+        result_code: "0",
+        summary: "No changes. Your infrastructure matches the configuration.",
+      };
+    }
+
+    if (
+      cleanOutput.includes(
+        "No changes. Your infrastructure matches the configuration.",
+      )
+    ) {
+      return {
+        result_code: "0",
+        summary: "No changes. Your infrastructure matches the configuration.",
+      };
     }
 
     const planMatch = cleanOutput.match(/Plan:.*/);
