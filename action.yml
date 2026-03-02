@@ -100,6 +100,7 @@ runs:
       run: node ${{ github.action_path }}/dist/index.js
 
     - uses: actions/upload-artifact@v4
+      if: always()
       name: Save Outputs
       with:
         name: ${{ steps.diff_action.outputs.job_id }}
