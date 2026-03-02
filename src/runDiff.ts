@@ -223,20 +223,27 @@ export class RunDiff {
     );
 
     if (exitCode !== 0) {
+      // When we exceed the read/write capacity of the DynamoDB table, we get this error.
+      if (cleanOutput.includes("ProvisionedThroughputExceededException")) {
+        return {
+          result_code: "1",
+          summary:
+            "DynamoDB is throttling state lock requests. See run for details.",
+        };
+      }
+
+      // State already lcked
+      if (cleanOutput.includes("Error acquiring the state lock")) {
+        return {
+          result_code: "1",
+          summary: "Error acquiring the state lock. See run for details.",
+        };
+      }
+
+      // Default
       return {
         result_code: "1",
         summary: `Plan failed with exit code ${exitCode}. See run for details.`,
-      };
-    }
-
-    if (
-      cleanOutput.includes(
-        "No changes. Your infrastructure matches the configuration.",
-      )
-    ) {
-      return {
-        result_code: "0",
-        summary: "No changes. Your infrastructure matches the configuration.",
       };
     }
 
