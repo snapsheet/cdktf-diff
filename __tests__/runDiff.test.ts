@@ -6,6 +6,12 @@ import * as exec from "@actions/exec";
 import * as fs from "fs";
 import * as path from "path";
 
+// Mock fs.writeFileSync so we can assert on it without touching disk; keep rest of fs for cleanup
+jest.mock("fs", () => ({
+  ...jest.requireActual<typeof import("fs")>("fs"),
+  writeFileSync: jest.fn()
+}));
+
 // Mock all external dependencies
 jest.mock("@actions/core", () => ({
   getInput: jest.fn(),
@@ -34,13 +40,13 @@ describe("RunDiff", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    
+
     // `Setup` core.getInput mock
-    (core.getInput as jest.Mock).mockImplementation((name: string) => 
-      mockInputs[name as keyof typeof mockInputs]
+    (core.getInput as jest.Mock).mockImplementation(
+      (name: string) => mockInputs[name as keyof typeof mockInputs]
     );
-    (core.getBooleanInput as jest.Mock).mockImplementation((name: string) => 
-      mockInputs[name as keyof typeof mockInputs] === "true"
+    (core.getBooleanInput as jest.Mock).mockImplementation(
+      (name: string) => mockInputs[name as keyof typeof mockInputs] === "true"
     );
 
     // Setup github.context
@@ -52,7 +58,10 @@ describe("RunDiff", () => {
 
   // Clean up after all tests
   afterAll(() => {
-    const outputPath = path.join(mockInputs.working_directory, mockInputs.output_filename);
+    const outputPath = path.join(
+      mockInputs.working_directory,
+      mockInputs.output_filename
+    );
     try {
       fs.unlinkSync(outputPath);
     } catch (error) {
@@ -77,15 +86,17 @@ describe("RunDiff", () => {
 
       // Create mock paginated response
       const mockJobs = [
-        ...Array(250).fill(null).map(() => ({
-          id: faker.number.int({ min: 1000, max: 9999 }),
-          name: "other-job",
-          html_url: faker.internet.url(),
-          status: "completed",
-          conclusion: "success",
-          started_at: faker.date.recent().toISOString(),
-          completed_at: faker.date.recent().toISOString()
-        })),
+        ...Array(250)
+          .fill(null)
+          .map(() => ({
+            id: faker.number.int({ min: 1000, max: 9999 }),
+            name: "other-job",
+            html_url: faker.internet.url(),
+            status: "completed",
+            conclusion: "success",
+            started_at: faker.date.recent().toISOString(),
+            completed_at: faker.date.recent().toISOString()
+          })),
         targetJob
       ];
 
@@ -112,14 +123,11 @@ describe("RunDiff", () => {
 
       // Verify paginate was called correctly
       expect(mockPaginate).toHaveBeenCalledTimes(1);
-      expect(mockPaginate).toHaveBeenCalledWith(
-        expect.any(Function),
-        {
-          owner: "test-owner",
-          repo: "test-repo",
-          run_id: 12345
-        }
-      );
+      expect(mockPaginate).toHaveBeenCalledWith(expect.any(Function), {
+        owner: "test-owner",
+        repo: "test-repo",
+        run_id: 12345
+      });
     });
 
     it("should throw an error if the workflow run cannot be found (octokit.paginate rejects)", async () => {
@@ -146,15 +154,17 @@ describe("RunDiff", () => {
 
     it("should throw error when job is not found after pagination", async () => {
       // Create mock paginated response with no matching job
-      const mockJobs = Array(50).fill(null).map(() => ({
-        id: faker.number.int({ min: 1000, max: 9999 }),
-        name: "different-job",
-        html_url: faker.internet.url(),
-        status: "completed",
-        conclusion: "success",
-        started_at: faker.date.recent().toISOString(),
-        completed_at: faker.date.recent().toISOString()
-      }));
+      const mockJobs = Array(50)
+        .fill(null)
+        .map(() => ({
+          id: faker.number.int({ min: 1000, max: 9999 }),
+          name: "different-job",
+          html_url: faker.internet.url(),
+          status: "completed",
+          conclusion: "success",
+          started_at: faker.date.recent().toISOString(),
+          completed_at: faker.date.recent().toISOString()
+        }));
 
       // Mock Octokit to return a single page with no matching job
       const mockPaginate = jest.fn().mockResolvedValue(mockJobs);
@@ -169,7 +179,7 @@ describe("RunDiff", () => {
       });
 
       const runDiff = new RunDiff();
-      
+
       // Verify that getJobInformation throws with the correct error message
       await expect(runDiff.getJobInformation()).rejects.toThrow(
         `Could not find job with name ${mockInputs.job_name}`
@@ -177,36 +187,72 @@ describe("RunDiff", () => {
 
       // Verify paginate was called correctly
       expect(mockPaginate).toHaveBeenCalledTimes(1);
-      expect(mockPaginate).toHaveBeenCalledWith(
-        expect.any(Function),
-        {
-          owner: "test-owner",
-          repo: "test-repo",
-          run_id: 12345
+      expect(mockPaginate).toHaveBeenCalledWith(expect.any(Function), {
+        owner: "test-owner",
+        repo: "test-repo",
+        run_id: 12345
+      });
+    });
+
+    it("should return empty string for html_url when job has no html_url", async () => {
+      const jobWithoutUrl = {
+        id: 99999,
+        name: "target-job",
+        html_url: undefined,
+        status: "completed",
+        conclusion: "success",
+        started_at: faker.date.recent().toISOString(),
+        completed_at: faker.date.recent().toISOString()
+      };
+
+      const mockPaginate = jest.fn().mockResolvedValue([jobWithoutUrl]);
+
+      (github.getOctokit as jest.Mock).mockReturnValue({
+        paginate: mockPaginate,
+        rest: {
+          actions: {
+            listJobsForWorkflowRun: jest.fn()
+          }
         }
-      );
+      });
+
+      const runDiff = new RunDiff();
+      const result = await runDiff.getJobInformation();
+
+      expect(result).toEqual({
+        job_id: 99999,
+        html_url: ""
+      });
     });
   });
 
   describe("runDiff", () => {
-    it("should handle failed planning with error", async () => {
-      // Mock exec to simulate failed planning
-      (exec.exec as jest.Mock).mockImplementation((_cmd: string, _args: string[], opts?: { listeners?: { stdout?: (data: Buffer) => void } }) => {
-        if (opts?.listeners?.stdout) {
-          opts.listeners.stdout(Buffer.from(
-            "Planning failed. Terraform encountered an error while generating this plan.\nError: Invalid configuration"
-          ));
+    it("should handle failed planning with generic exit code message", async () => {
+      // Mock exec to simulate failed planning (non-zero exit; no special error text)
+      (exec.exec as jest.Mock).mockImplementation(
+        (
+          _cmd: string,
+          _args: string[],
+          opts?: { listeners?: { stdout?: (data: Buffer) => void } }
+        ) => {
+          if (opts?.listeners?.stdout) {
+            opts.listeners.stdout(
+              Buffer.from(
+                "Planning failed. Terraform encountered an error while generating this plan.\nError: Invalid configuration"
+              )
+            );
+          }
+          return Promise.resolve(1);
         }
-        return Promise.resolve(1);
-      });
+      );
 
       const runDiff = new RunDiff();
       const result = await runDiff.runDiff();
 
-      // Verify the error is handled correctly
+      // Verify the error is handled correctly (generic non-zero exit message)
       expect(result).toEqual({
         result_code: "1",
-        summary: "Error: Invalid configuration"
+        summary: "Plan failed with exit code 1. See run for details."
       });
 
       // Verify exec was called with correct command
@@ -217,16 +263,93 @@ describe("RunDiff", () => {
       );
     });
 
+    it("should handle DynamoDB throttling error (ProvisionedThroughputExceededException)", async () => {
+      (exec.exec as jest.Mock).mockImplementation(
+        (
+          _cmd: string,
+          _args: string[],
+          opts?: { listeners?: { stdout?: (data: Buffer) => void } }
+        ) => {
+          if (opts?.listeners?.stdout) {
+            opts.listeners.stdout(
+              Buffer.from(
+                "Error: ProvisionedThroughputExceededException: The level of configured provisioned throughput for the table was exceeded."
+              )
+            );
+          }
+          return Promise.resolve(1);
+        }
+      );
+
+      const runDiff = new RunDiff();
+      const result = await runDiff.runDiff();
+
+      expect(result).toEqual({
+        result_code: "1",
+        summary:
+          "DynamoDB is throttling state lock requests. See run for details."
+      });
+    });
+
+    it("should handle state lock error (Error acquiring the state lock)", async () => {
+      (exec.exec as jest.Mock).mockImplementation(
+        (
+          _cmd: string,
+          _args: string[],
+          opts?: { listeners?: { stdout?: (data: Buffer) => void } }
+        ) => {
+          if (opts?.listeners?.stdout) {
+            opts.listeners.stdout(
+              Buffer.from(
+                "Error acquiring the state lock. Another process is holding the lock."
+              )
+            );
+          }
+          return Promise.resolve(1);
+        }
+      );
+
+      const runDiff = new RunDiff();
+      const result = await runDiff.runDiff();
+
+      expect(result).toEqual({
+        result_code: "1",
+        summary: "Error acquiring the state lock. See run for details."
+      });
+    });
+
+    it("should return error when exec throws", async () => {
+      (exec.exec as jest.Mock).mockRejectedValue(
+        new Error("Exec failed: command not found")
+      );
+
+      const runDiff = new RunDiff();
+      const result = await runDiff.runDiff();
+
+      expect(result).toEqual({
+        result_code: "1",
+        summary: "Exec failed: command not found"
+      });
+    });
+
     it("should handle no changes scenario", async () => {
       // Mock exec to simulate no changes output
-      (exec.exec as jest.Mock).mockImplementation((_cmd: string, _args: string[], opts?: { listeners?: { stdout?: (data: Buffer) => void } }) => {
-        if (opts?.listeners?.stdout) {
-          opts.listeners.stdout(Buffer.from(
-            "No changes. Your infrastructure matches the configuration."
-          ));
+      (exec.exec as jest.Mock).mockImplementation(
+        (
+          _cmd: string,
+          _args: string[],
+          opts?: { listeners?: { stdout?: (data: Buffer) => void } }
+        ) => {
+          if (opts?.listeners?.stdout) {
+            opts.listeners.stdout(
+              Buffer.from(
+                "No changes. Your infrastructure matches the configuration."
+              )
+            );
+          }
+          return Promise.resolve(0);
         }
-        return Promise.resolve(0);
-      });
+      );
 
       const runDiff = new RunDiff();
       const result = await runDiff.runDiff();
@@ -247,14 +370,20 @@ describe("RunDiff", () => {
 
     it("should handle pending changes scenario", async () => {
       const planSummary = "Plan: 1 to add, 2 to change, 3 to destroy.";
-      
+
       // Mock exec to simulate output with pending changes
-      (exec.exec as jest.Mock).mockImplementation((_cmd: string, _args: string[], opts?: { listeners?: { stdout?: (data: Buffer) => void } }) => {
-        if (opts?.listeners?.stdout) {
-          opts.listeners.stdout(Buffer.from(planSummary));
+      (exec.exec as jest.Mock).mockImplementation(
+        (
+          _cmd: string,
+          _args: string[],
+          opts?: { listeners?: { stdout?: (data: Buffer) => void } }
+        ) => {
+          if (opts?.listeners?.stdout) {
+            opts.listeners.stdout(Buffer.from(planSummary));
+          }
+          return Promise.resolve(0);
         }
-        return Promise.resolve(0);
-      });
+      );
 
       const runDiff = new RunDiff();
       const result = await runDiff.runDiff();
@@ -275,14 +404,22 @@ describe("RunDiff", () => {
 
     it("should handle indeterminate diff result", async () => {
       // Mock exec to simulate unexpected output
-      (exec.exec as jest.Mock).mockImplementation((_cmd: string, _args: string[], opts?: { listeners?: { stdout?: (data: Buffer) => void } }) => {
-        if (opts?.listeners?.stdout) {
-          opts.listeners.stdout(Buffer.from(
-            "Some unexpected output that doesn't match any known patterns"
-          ));
+      (exec.exec as jest.Mock).mockImplementation(
+        (
+          _cmd: string,
+          _args: string[],
+          opts?: { listeners?: { stdout?: (data: Buffer) => void } }
+        ) => {
+          if (opts?.listeners?.stdout) {
+            opts.listeners.stdout(
+              Buffer.from(
+                "Some unexpected output that doesn't match any known patterns"
+              )
+            );
+          }
+          return Promise.resolve(0);
         }
-        return Promise.resolve(0);
-      });
+      );
 
       const runDiff = new RunDiff();
       const result = await runDiff.runDiff();
@@ -301,19 +438,62 @@ describe("RunDiff", () => {
       );
     });
 
+    it("should use default terraform_version and working_directory when inputs are empty", async () => {
+      (core.getInput as jest.Mock).mockImplementation((name: string) => {
+        if (name === "terraform_version" || name === "working_directory")
+          return "";
+        return mockInputs[name as keyof typeof mockInputs];
+      });
+      (exec.exec as jest.Mock).mockImplementation(
+        (
+          _cmd: string,
+          _args: string[],
+          opts?: { listeners?: { stdout?: (data: Buffer) => void } }
+        ) => {
+          if (opts?.listeners?.stdout) {
+            opts.listeners.stdout(
+              Buffer.from(
+                "No changes. Your infrastructure matches the configuration."
+              )
+            );
+          }
+          return Promise.resolve(0);
+        }
+      );
+
+      const runDiff = new RunDiff();
+      const result = await runDiff.runDiff();
+
+      expect(result.result_code).toBe("0");
+      // Constructor used defaults: terraform_version "1.8.0", working_directory "./"
+      expect(exec.exec).toHaveBeenCalledWith(
+        "bash",
+        ["-c", `CI=1 npx cdktf diff ${mockInputs.stack}`],
+        expect.objectContaining({ cwd: "./" })
+      );
+    });
+
     it("should add skip-synth flag when input is true", async () => {
       // Set skip-synth input to true
-      (core.getBooleanInput as jest.Mock).mockImplementation((name: string) => 
-        name === "skip_synth" ? true : mockInputs[name as keyof typeof mockInputs] === "true"
+      (core.getBooleanInput as jest.Mock).mockImplementation((name: string) =>
+        name === "skip_synth"
+          ? true
+          : mockInputs[name as keyof typeof mockInputs] === "true"
       );
 
       // Mock exec to simulate no changes output
-      (exec.exec as jest.Mock).mockImplementation((_cmd: string, _args: string[], opts?: { listeners?: { stdout?: (data: Buffer) => void } }) => {
-        if (opts?.listeners?.stdout) {
-          opts.listeners.stdout(Buffer.from("No changes"));
+      (exec.exec as jest.Mock).mockImplementation(
+        (
+          _cmd: string,
+          _args: string[],
+          opts?: { listeners?: { stdout?: (data: Buffer) => void } }
+        ) => {
+          if (opts?.listeners?.stdout) {
+            opts.listeners.stdout(Buffer.from("No changes"));
+          }
+          return Promise.resolve(0);
         }
-        return Promise.resolve(0);
-      });
+      );
 
       const runDiff = new RunDiff();
       await runDiff.runDiff();
@@ -333,20 +513,26 @@ describe("RunDiff", () => {
         if (name === "stub_output_file") return stubFile;
         return mockInputs[name as keyof typeof mockInputs];
       });
-      (core.getBooleanInput as jest.Mock).mockImplementation((name: string) =>
-        mockInputs[name as keyof typeof mockInputs] === "true"
+      (core.getBooleanInput as jest.Mock).mockImplementation(
+        (name: string) => mockInputs[name as keyof typeof mockInputs] === "true"
       );
 
       let calledCommand = "";
       let calledArgs: string[] = [];
-      (exec.exec as jest.Mock).mockImplementation((cmd: string, args: string[], opts?: any) => {
-        calledCommand = cmd;
-        calledArgs = args;
-        if (opts?.listeners?.stdout) {
-          opts.listeners.stdout(Buffer.from("No changes. Your infrastructure matches the configuration."));
+      (exec.exec as jest.Mock).mockImplementation(
+        (cmd: string, args: string[], opts?: any) => {
+          calledCommand = cmd;
+          calledArgs = args;
+          if (opts?.listeners?.stdout) {
+            opts.listeners.stdout(
+              Buffer.from(
+                "No changes. Your infrastructure matches the configuration."
+              )
+            );
+          }
+          return Promise.resolve(0);
         }
-        return Promise.resolve(0);
-      });
+      );
 
       const runDiff = new RunDiff();
       const result = await runDiff.runDiff();
@@ -362,18 +548,53 @@ describe("RunDiff", () => {
       });
     });
 
+    it("should strip ANSI escape codes from output before parsing", async () => {
+      const ansiNoChanges =
+        "\x1B[32mNo changes. Your infrastructure matches the configuration.\x1B[0m";
+      (exec.exec as jest.Mock).mockImplementation(
+        (
+          _cmd: string,
+          _args: string[],
+          opts?: { listeners?: { stdout?: (data: Buffer) => void } }
+        ) => {
+          if (opts?.listeners?.stdout) {
+            opts.listeners.stdout(Buffer.from(ansiNoChanges));
+          }
+          return Promise.resolve(0);
+        }
+      );
+
+      const runDiff = new RunDiff();
+      const result = await runDiff.runDiff();
+
+      expect(result).toEqual({
+        result_code: "0",
+        summary: "No changes. Your infrastructure matches the configuration."
+      });
+    });
 
     it("should capture both stdout and stderr output", async () => {
       // Mock exec to simulate output to both streams
-      (exec.exec as jest.Mock).mockImplementation((_cmd: string, _args: string[], opts?: { listeners?: { stdout?: (data: Buffer) => void; stderr?: (data: Buffer) => void } }) => {
-        if (opts?.listeners?.stdout) {
-          opts.listeners.stdout(Buffer.from("Plan: 1 to add"));
+      (exec.exec as jest.Mock).mockImplementation(
+        (
+          _cmd: string,
+          _args: string[],
+          opts?: {
+            listeners?: {
+              stdout?: (data: Buffer) => void;
+              stderr?: (data: Buffer) => void;
+            };
+          }
+        ) => {
+          if (opts?.listeners?.stdout) {
+            opts.listeners.stdout(Buffer.from("Plan: 1 to add"));
+          }
+          if (opts?.listeners?.stderr) {
+            opts.listeners.stderr(Buffer.from(", 0 to change, 0 to destroy."));
+          }
+          return Promise.resolve(0);
         }
-        if (opts?.listeners?.stderr) {
-          opts.listeners.stderr(Buffer.from(", 0 to change, 0 to destroy."));
-        }
-        return Promise.resolve(0);
-      });
+      );
 
       const runDiff = new RunDiff();
       const result = await runDiff.runDiff();
@@ -393,23 +614,39 @@ describe("RunDiff", () => {
         job_id: 12345,
         html_url: "https://github.com/test-owner/test-repo/actions/runs/12345"
       };
-      jest.spyOn(RunDiff.prototype, "getJobInformation").mockResolvedValue(mockJobInfo);
+      jest
+        .spyOn(RunDiff.prototype, "getJobInformation")
+        .mockResolvedValue(mockJobInfo);
 
       const errorSummary = "Error: Invalid configuration";
       const mockDiffResult = {
         result_code: "1" as const,
         summary: errorSummary
       };
-      jest.spyOn(RunDiff.prototype, "runDiff").mockResolvedValue(mockDiffResult);
+      jest
+        .spyOn(RunDiff.prototype, "runDiff")
+        .mockResolvedValue(mockDiffResult);
 
       const runDiff = new RunDiff();
       await runDiff.run();
 
       // Verify outputs were set
-      expect(core.setOutput).toHaveBeenCalledWith("job_id", mockJobInfo.job_id.toString());
-      expect(core.setOutput).toHaveBeenCalledWith("html_url", mockJobInfo.html_url);
-      expect(core.setOutput).toHaveBeenCalledWith("result_code", mockDiffResult.result_code);
-      expect(core.setOutput).toHaveBeenCalledWith("summary", mockDiffResult.summary);
+      expect(core.setOutput).toHaveBeenCalledWith(
+        "job_id",
+        mockJobInfo.job_id.toString()
+      );
+      expect(core.setOutput).toHaveBeenCalledWith(
+        "html_url",
+        mockJobInfo.html_url
+      );
+      expect(core.setOutput).toHaveBeenCalledWith(
+        "result_code",
+        mockDiffResult.result_code
+      );
+      expect(core.setOutput).toHaveBeenCalledWith(
+        "summary",
+        mockDiffResult.summary
+      );
       expect(core.setOutput).toHaveBeenCalledWith("stack", mockInputs.stack);
 
       // Verify job was failed with error summary
@@ -422,23 +659,75 @@ describe("RunDiff", () => {
         job_id: 12345,
         html_url: "https://github.com/test-owner/test-repo/actions/runs/12345"
       };
-      jest.spyOn(RunDiff.prototype, "getJobInformation").mockResolvedValue(mockJobInfo);
+      jest
+        .spyOn(RunDiff.prototype, "getJobInformation")
+        .mockResolvedValue(mockJobInfo);
 
       const mockDiffResult = {
         result_code: "2" as const,
         summary: "Plan: 1 to add, 0 to change, 0 to destroy."
       };
-      jest.spyOn(RunDiff.prototype, "runDiff").mockResolvedValue(mockDiffResult);
+      jest
+        .spyOn(RunDiff.prototype, "runDiff")
+        .mockResolvedValue(mockDiffResult);
 
       const runDiff = new RunDiff();
       await runDiff.run();
 
       // Verify outputs were set correctly
-      expect(core.setOutput).toHaveBeenCalledWith("job_id", mockJobInfo.job_id.toString());
-      expect(core.setOutput).toHaveBeenCalledWith("html_url", mockJobInfo.html_url);
-      expect(core.setOutput).toHaveBeenCalledWith("result_code", mockDiffResult.result_code);
-      expect(core.setOutput).toHaveBeenCalledWith("summary", mockDiffResult.summary);
+      expect(core.setOutput).toHaveBeenCalledWith(
+        "job_id",
+        mockJobInfo.job_id.toString()
+      );
+      expect(core.setOutput).toHaveBeenCalledWith(
+        "html_url",
+        mockJobInfo.html_url
+      );
+      expect(core.setOutput).toHaveBeenCalledWith(
+        "result_code",
+        mockDiffResult.result_code
+      );
+      expect(core.setOutput).toHaveBeenCalledWith(
+        "summary",
+        mockDiffResult.summary
+      );
       expect(core.setOutput).toHaveBeenCalledWith("stack", mockInputs.stack);
+
+      // Verify output file was written with correct path and JSON content
+      const expectedPath = path.join(
+        mockInputs.working_directory,
+        mockInputs.output_filename
+      );
+      expect(fs.writeFileSync).toHaveBeenCalledTimes(1);
+      expect(fs.writeFileSync).toHaveBeenCalledWith(
+        expectedPath,
+        JSON.stringify({
+          html_url: mockJobInfo.html_url,
+          job_id: mockJobInfo.job_id.toString(),
+          result_code: mockDiffResult.result_code,
+          stack: mockInputs.stack,
+          summary: mockDiffResult.summary
+        })
+      );
+    });
+
+    it("should not call setFailed when result_code is 0 or 2", async () => {
+      const mockJobInfo = {
+        job_id: 12345,
+        html_url: "https://example.com/job"
+      };
+      jest
+        .spyOn(RunDiff.prototype, "getJobInformation")
+        .mockResolvedValue(mockJobInfo);
+      jest.spyOn(RunDiff.prototype, "runDiff").mockResolvedValue({
+        result_code: "0",
+        summary: "No changes. Your infrastructure matches the configuration."
+      });
+
+      const runDiff = new RunDiff();
+      await runDiff.run();
+
+      expect(core.setFailed).not.toHaveBeenCalled();
     });
   });
-}); 
+});
