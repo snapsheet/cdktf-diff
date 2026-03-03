@@ -9,7 +9,7 @@ import * as path from "path";
 // Mock fs.writeFileSync so we can assert on it without touching disk; keep rest of fs for cleanup
 jest.mock("fs", () => ({
   ...jest.requireActual<typeof import("fs")>("fs"),
-  writeFileSync: jest.fn(),
+  writeFileSync: jest.fn()
 }));
 
 // Mock all external dependencies
@@ -18,7 +18,7 @@ jest.mock("@actions/core", () => ({
   getBooleanInput: jest.fn(),
   setOutput: jest.fn(),
   setFailed: jest.fn(),
-  debug: jest.fn(),
+  debug: jest.fn()
 }));
 
 jest.mock("@actions/github");
@@ -35,7 +35,7 @@ describe("RunDiff", () => {
     stack: "test-stack",
     terraform_version: "1.8.0",
     working_directory: "./",
-    skip_synth: "false",
+    skip_synth: "false"
   };
 
   beforeEach(() => {
@@ -43,16 +43,16 @@ describe("RunDiff", () => {
 
     // `Setup` core.getInput mock
     (core.getInput as jest.Mock).mockImplementation(
-      (name: string) => mockInputs[name as keyof typeof mockInputs],
+      (name: string) => mockInputs[name as keyof typeof mockInputs]
     );
     (core.getBooleanInput as jest.Mock).mockImplementation(
-      (name: string) => mockInputs[name as keyof typeof mockInputs] === "true",
+      (name: string) => mockInputs[name as keyof typeof mockInputs] === "true"
     );
 
     // Setup github.context
     (github.context as unknown) = {
       repo: { owner: "test-owner", repo: "test-repo" },
-      runId: 12345,
+      runId: 12345
     };
   });
 
@@ -60,7 +60,7 @@ describe("RunDiff", () => {
   afterAll(() => {
     const outputPath = path.join(
       mockInputs.working_directory,
-      mockInputs.output_filename,
+      mockInputs.output_filename
     );
     try {
       fs.unlinkSync(outputPath);
@@ -81,7 +81,7 @@ describe("RunDiff", () => {
         status: "completed",
         conclusion: "success",
         started_at: faker.date.recent().toISOString(),
-        completed_at: faker.date.recent().toISOString(),
+        completed_at: faker.date.recent().toISOString()
       };
 
       // Create mock paginated response
@@ -95,9 +95,9 @@ describe("RunDiff", () => {
             status: "completed",
             conclusion: "success",
             started_at: faker.date.recent().toISOString(),
-            completed_at: faker.date.recent().toISOString(),
+            completed_at: faker.date.recent().toISOString()
           })),
-        targetJob,
+        targetJob
       ];
 
       // Mock Octokit paginate to return all jobs
@@ -107,9 +107,9 @@ describe("RunDiff", () => {
         paginate: mockPaginate,
         rest: {
           actions: {
-            listJobsForWorkflowRun: jest.fn(),
-          },
-        },
+            listJobsForWorkflowRun: jest.fn()
+          }
+        }
       });
 
       const runDiff = new RunDiff();
@@ -118,7 +118,7 @@ describe("RunDiff", () => {
       // Verify the correct job was found
       expect(result).toEqual({
         job_id: targetJob.id,
-        html_url: targetJob.html_url,
+        html_url: targetJob.html_url
       });
 
       // Verify paginate was called correctly
@@ -126,7 +126,7 @@ describe("RunDiff", () => {
       expect(mockPaginate).toHaveBeenCalledWith(expect.any(Function), {
         owner: "test-owner",
         repo: "test-repo",
-        run_id: 12345,
+        run_id: 12345
       });
     });
 
@@ -138,9 +138,9 @@ describe("RunDiff", () => {
         paginate: mockPaginate,
         rest: {
           actions: {
-            listJobsForWorkflowRun: jest.fn(),
-          },
-        },
+            listJobsForWorkflowRun: jest.fn()
+          }
+        }
       });
 
       const runDiff = new RunDiff();
@@ -163,7 +163,7 @@ describe("RunDiff", () => {
           status: "completed",
           conclusion: "success",
           started_at: faker.date.recent().toISOString(),
-          completed_at: faker.date.recent().toISOString(),
+          completed_at: faker.date.recent().toISOString()
         }));
 
       // Mock Octokit to return a single page with no matching job
@@ -173,16 +173,16 @@ describe("RunDiff", () => {
         paginate: mockPaginate,
         rest: {
           actions: {
-            listJobsForWorkflowRun: jest.fn(),
-          },
-        },
+            listJobsForWorkflowRun: jest.fn()
+          }
+        }
       });
 
       const runDiff = new RunDiff();
 
       // Verify that getJobInformation throws with the correct error message
       await expect(runDiff.getJobInformation()).rejects.toThrow(
-        `Could not find job with name ${mockInputs.job_name}`,
+        `Could not find job with name ${mockInputs.job_name}`
       );
 
       // Verify paginate was called correctly
@@ -190,7 +190,7 @@ describe("RunDiff", () => {
       expect(mockPaginate).toHaveBeenCalledWith(expect.any(Function), {
         owner: "test-owner",
         repo: "test-repo",
-        run_id: 12345,
+        run_id: 12345
       });
     });
 
@@ -202,7 +202,7 @@ describe("RunDiff", () => {
         status: "completed",
         conclusion: "success",
         started_at: faker.date.recent().toISOString(),
-        completed_at: faker.date.recent().toISOString(),
+        completed_at: faker.date.recent().toISOString()
       };
 
       const mockPaginate = jest.fn().mockResolvedValue([jobWithoutUrl]);
@@ -211,9 +211,9 @@ describe("RunDiff", () => {
         paginate: mockPaginate,
         rest: {
           actions: {
-            listJobsForWorkflowRun: jest.fn(),
-          },
-        },
+            listJobsForWorkflowRun: jest.fn()
+          }
+        }
       });
 
       const runDiff = new RunDiff();
@@ -221,7 +221,7 @@ describe("RunDiff", () => {
 
       expect(result).toEqual({
         job_id: 99999,
-        html_url: "",
+        html_url: ""
       });
     });
   });
@@ -233,17 +233,17 @@ describe("RunDiff", () => {
         (
           _cmd: string,
           _args: string[],
-          opts?: { listeners?: { stdout?: (data: Buffer) => void } },
+          opts?: { listeners?: { stdout?: (data: Buffer) => void } }
         ) => {
           if (opts?.listeners?.stdout) {
             opts.listeners.stdout(
               Buffer.from(
-                "Planning failed. Terraform encountered an error while generating this plan.\nError: Invalid configuration",
-              ),
+                "Planning failed. Terraform encountered an error while generating this plan.\nError: Invalid configuration"
+              )
             );
           }
           return Promise.resolve(1);
-        },
+        }
       );
 
       const runDiff = new RunDiff();
@@ -252,14 +252,14 @@ describe("RunDiff", () => {
       // Verify the error is handled correctly (generic non-zero exit message)
       expect(result).toEqual({
         result_code: "1",
-        summary: "Plan failed with exit code 1. See run for details.",
+        summary: "Plan failed with exit code 1. See run for details."
       });
 
       // Verify exec was called with correct command
       expect(exec.exec).toHaveBeenCalledWith(
         "bash",
         ["-c", `CI=1 npx cdktf diff ${mockInputs.stack}`],
-        expect.any(Object),
+        expect.any(Object)
       );
     });
 
@@ -268,17 +268,17 @@ describe("RunDiff", () => {
         (
           _cmd: string,
           _args: string[],
-          opts?: { listeners?: { stdout?: (data: Buffer) => void } },
+          opts?: { listeners?: { stdout?: (data: Buffer) => void } }
         ) => {
           if (opts?.listeners?.stdout) {
             opts.listeners.stdout(
               Buffer.from(
-                "Error: ProvisionedThroughputExceededException: The level of configured provisioned throughput for the table was exceeded.",
-              ),
+                "Error: ProvisionedThroughputExceededException: The level of configured provisioned throughput for the table was exceeded."
+              )
             );
           }
           return Promise.resolve(1);
-        },
+        }
       );
 
       const runDiff = new RunDiff();
@@ -287,7 +287,7 @@ describe("RunDiff", () => {
       expect(result).toEqual({
         result_code: "1",
         summary:
-          "DynamoDB is throttling state lock requests. See run for details.",
+          "DynamoDB is throttling state lock requests. See run for details."
       });
     });
 
@@ -296,17 +296,17 @@ describe("RunDiff", () => {
         (
           _cmd: string,
           _args: string[],
-          opts?: { listeners?: { stdout?: (data: Buffer) => void } },
+          opts?: { listeners?: { stdout?: (data: Buffer) => void } }
         ) => {
           if (opts?.listeners?.stdout) {
             opts.listeners.stdout(
               Buffer.from(
-                "Error acquiring the state lock. Another process is holding the lock.",
-              ),
+                "Error acquiring the state lock. Another process is holding the lock."
+              )
             );
           }
           return Promise.resolve(1);
-        },
+        }
       );
 
       const runDiff = new RunDiff();
@@ -314,13 +314,13 @@ describe("RunDiff", () => {
 
       expect(result).toEqual({
         result_code: "1",
-        summary: "Error acquiring the state lock. See run for details.",
+        summary: "Error acquiring the state lock. See run for details."
       });
     });
 
     it("should return error when exec throws", async () => {
       (exec.exec as jest.Mock).mockRejectedValue(
-        new Error("Exec failed: command not found"),
+        new Error("Exec failed: command not found")
       );
 
       const runDiff = new RunDiff();
@@ -328,7 +328,7 @@ describe("RunDiff", () => {
 
       expect(result).toEqual({
         result_code: "1",
-        summary: "Exec failed: command not found",
+        summary: "Exec failed: command not found"
       });
     });
 
@@ -338,17 +338,17 @@ describe("RunDiff", () => {
         (
           _cmd: string,
           _args: string[],
-          opts?: { listeners?: { stdout?: (data: Buffer) => void } },
+          opts?: { listeners?: { stdout?: (data: Buffer) => void } }
         ) => {
           if (opts?.listeners?.stdout) {
             opts.listeners.stdout(
               Buffer.from(
-                "No changes. Your infrastructure matches the configuration.",
-              ),
+                "No changes. Your infrastructure matches the configuration."
+              )
             );
           }
           return Promise.resolve(0);
-        },
+        }
       );
 
       const runDiff = new RunDiff();
@@ -357,14 +357,14 @@ describe("RunDiff", () => {
       // Verify the no changes case is handled correctly
       expect(result).toEqual({
         result_code: "0",
-        summary: "No changes. Your infrastructure matches the configuration.",
+        summary: "No changes. Your infrastructure matches the configuration."
       });
 
       // Verify exec was called with correct command
       expect(exec.exec).toHaveBeenCalledWith(
         "bash",
         ["-c", `CI=1 npx cdktf diff ${mockInputs.stack}`],
-        expect.any(Object),
+        expect.any(Object)
       );
     });
 
@@ -376,13 +376,13 @@ describe("RunDiff", () => {
         (
           _cmd: string,
           _args: string[],
-          opts?: { listeners?: { stdout?: (data: Buffer) => void } },
+          opts?: { listeners?: { stdout?: (data: Buffer) => void } }
         ) => {
           if (opts?.listeners?.stdout) {
             opts.listeners.stdout(Buffer.from(planSummary));
           }
           return Promise.resolve(0);
-        },
+        }
       );
 
       const runDiff = new RunDiff();
@@ -391,14 +391,14 @@ describe("RunDiff", () => {
       // Verify the pending changes case is handled correctly
       expect(result).toEqual({
         result_code: "2",
-        summary: planSummary,
+        summary: planSummary
       });
 
       // Verify exec was called with correct command
       expect(exec.exec).toHaveBeenCalledWith(
         "bash",
         ["-c", `CI=1 npx cdktf diff ${mockInputs.stack}`],
-        expect.any(Object),
+        expect.any(Object)
       );
     });
 
@@ -408,17 +408,17 @@ describe("RunDiff", () => {
         (
           _cmd: string,
           _args: string[],
-          opts?: { listeners?: { stdout?: (data: Buffer) => void } },
+          opts?: { listeners?: { stdout?: (data: Buffer) => void } }
         ) => {
           if (opts?.listeners?.stdout) {
             opts.listeners.stdout(
               Buffer.from(
-                "Some unexpected output that doesn't match any known patterns",
-              ),
+                "Some unexpected output that doesn't match any known patterns"
+              )
             );
           }
           return Promise.resolve(0);
-        },
+        }
       );
 
       const runDiff = new RunDiff();
@@ -427,14 +427,14 @@ describe("RunDiff", () => {
       // Verify the unknown error case is handled correctly
       expect(result).toEqual({
         result_code: "1",
-        summary: "Could not determine if diff ran successfully",
+        summary: "Could not determine if diff ran successfully"
       });
 
       // Verify exec was called with correct command
       expect(exec.exec).toHaveBeenCalledWith(
         "bash",
         ["-c", `CI=1 npx cdktf diff ${mockInputs.stack}`],
-        expect.any(Object),
+        expect.any(Object)
       );
     });
 
@@ -448,17 +448,17 @@ describe("RunDiff", () => {
         (
           _cmd: string,
           _args: string[],
-          opts?: { listeners?: { stdout?: (data: Buffer) => void } },
+          opts?: { listeners?: { stdout?: (data: Buffer) => void } }
         ) => {
           if (opts?.listeners?.stdout) {
             opts.listeners.stdout(
               Buffer.from(
-                "No changes. Your infrastructure matches the configuration.",
-              ),
+                "No changes. Your infrastructure matches the configuration."
+              )
             );
           }
           return Promise.resolve(0);
-        },
+        }
       );
 
       const runDiff = new RunDiff();
@@ -469,7 +469,7 @@ describe("RunDiff", () => {
       expect(exec.exec).toHaveBeenCalledWith(
         "bash",
         ["-c", `CI=1 npx cdktf diff ${mockInputs.stack}`],
-        expect.objectContaining({ cwd: "./" }),
+        expect.objectContaining({ cwd: "./" })
       );
     });
 
@@ -478,7 +478,7 @@ describe("RunDiff", () => {
       (core.getBooleanInput as jest.Mock).mockImplementation((name: string) =>
         name === "skip_synth"
           ? true
-          : mockInputs[name as keyof typeof mockInputs] === "true",
+          : mockInputs[name as keyof typeof mockInputs] === "true"
       );
 
       // Mock exec to simulate no changes output
@@ -486,13 +486,13 @@ describe("RunDiff", () => {
         (
           _cmd: string,
           _args: string[],
-          opts?: { listeners?: { stdout?: (data: Buffer) => void } },
+          opts?: { listeners?: { stdout?: (data: Buffer) => void } }
         ) => {
           if (opts?.listeners?.stdout) {
             opts.listeners.stdout(Buffer.from("No changes"));
           }
           return Promise.resolve(0);
-        },
+        }
       );
 
       const runDiff = new RunDiff();
@@ -502,7 +502,7 @@ describe("RunDiff", () => {
       expect(exec.exec).toHaveBeenCalledWith(
         "bash",
         ["-c", `CI=1 npx cdktf diff --skip-synth ${mockInputs.stack}`],
-        expect.any(Object),
+        expect.any(Object)
       );
     });
 
@@ -514,8 +514,7 @@ describe("RunDiff", () => {
         return mockInputs[name as keyof typeof mockInputs];
       });
       (core.getBooleanInput as jest.Mock).mockImplementation(
-        (name: string) =>
-          mockInputs[name as keyof typeof mockInputs] === "true",
+        (name: string) => mockInputs[name as keyof typeof mockInputs] === "true"
       );
 
       let calledCommand = "";
@@ -527,12 +526,12 @@ describe("RunDiff", () => {
           if (opts?.listeners?.stdout) {
             opts.listeners.stdout(
               Buffer.from(
-                "No changes. Your infrastructure matches the configuration.",
-              ),
+                "No changes. Your infrastructure matches the configuration."
+              )
             );
           }
           return Promise.resolve(0);
-        },
+        }
       );
 
       const runDiff = new RunDiff();
@@ -545,7 +544,7 @@ describe("RunDiff", () => {
       expect(calledArgs[1]).not.toContain("cdktf diff");
       expect(result).toEqual({
         result_code: "0",
-        summary: "No changes. Your infrastructure matches the configuration.",
+        summary: "No changes. Your infrastructure matches the configuration."
       });
     });
 
@@ -556,13 +555,13 @@ describe("RunDiff", () => {
         (
           _cmd: string,
           _args: string[],
-          opts?: { listeners?: { stdout?: (data: Buffer) => void } },
+          opts?: { listeners?: { stdout?: (data: Buffer) => void } }
         ) => {
           if (opts?.listeners?.stdout) {
             opts.listeners.stdout(Buffer.from(ansiNoChanges));
           }
           return Promise.resolve(0);
-        },
+        }
       );
 
       const runDiff = new RunDiff();
@@ -570,7 +569,7 @@ describe("RunDiff", () => {
 
       expect(result).toEqual({
         result_code: "0",
-        summary: "No changes. Your infrastructure matches the configuration.",
+        summary: "No changes. Your infrastructure matches the configuration."
       });
     });
 
@@ -585,7 +584,7 @@ describe("RunDiff", () => {
               stdout?: (data: Buffer) => void;
               stderr?: (data: Buffer) => void;
             };
-          },
+          }
         ) => {
           if (opts?.listeners?.stdout) {
             opts.listeners.stdout(Buffer.from("Plan: 1 to add"));
@@ -594,7 +593,7 @@ describe("RunDiff", () => {
             opts.listeners.stderr(Buffer.from(", 0 to change, 0 to destroy."));
           }
           return Promise.resolve(0);
-        },
+        }
       );
 
       const runDiff = new RunDiff();
@@ -603,7 +602,7 @@ describe("RunDiff", () => {
       // Verify combined output is processed correctly
       expect(result).toEqual({
         result_code: "2",
-        summary: "Plan: 1 to add, 0 to change, 0 to destroy.",
+        summary: "Plan: 1 to add, 0 to change, 0 to destroy."
       });
     });
   });
@@ -613,7 +612,7 @@ describe("RunDiff", () => {
       // Mock responses with error result
       const mockJobInfo = {
         job_id: 12345,
-        html_url: "https://github.com/test-owner/test-repo/actions/runs/12345",
+        html_url: "https://github.com/test-owner/test-repo/actions/runs/12345"
       };
       jest
         .spyOn(RunDiff.prototype, "getJobInformation")
@@ -622,7 +621,7 @@ describe("RunDiff", () => {
       const errorSummary = "Error: Invalid configuration";
       const mockDiffResult = {
         result_code: "1" as const,
-        summary: errorSummary,
+        summary: errorSummary
       };
       jest
         .spyOn(RunDiff.prototype, "runDiff")
@@ -634,19 +633,19 @@ describe("RunDiff", () => {
       // Verify outputs were set
       expect(core.setOutput).toHaveBeenCalledWith(
         "job_id",
-        mockJobInfo.job_id.toString(),
+        mockJobInfo.job_id.toString()
       );
       expect(core.setOutput).toHaveBeenCalledWith(
         "html_url",
-        mockJobInfo.html_url,
+        mockJobInfo.html_url
       );
       expect(core.setOutput).toHaveBeenCalledWith(
         "result_code",
-        mockDiffResult.result_code,
+        mockDiffResult.result_code
       );
       expect(core.setOutput).toHaveBeenCalledWith(
         "summary",
-        mockDiffResult.summary,
+        mockDiffResult.summary
       );
       expect(core.setOutput).toHaveBeenCalledWith("stack", mockInputs.stack);
 
@@ -658,7 +657,7 @@ describe("RunDiff", () => {
       // Mock successful responses
       const mockJobInfo = {
         job_id: 12345,
-        html_url: "https://github.com/test-owner/test-repo/actions/runs/12345",
+        html_url: "https://github.com/test-owner/test-repo/actions/runs/12345"
       };
       jest
         .spyOn(RunDiff.prototype, "getJobInformation")
@@ -666,7 +665,7 @@ describe("RunDiff", () => {
 
       const mockDiffResult = {
         result_code: "2" as const,
-        summary: "Plan: 1 to add, 0 to change, 0 to destroy.",
+        summary: "Plan: 1 to add, 0 to change, 0 to destroy."
       };
       jest
         .spyOn(RunDiff.prototype, "runDiff")
@@ -678,26 +677,26 @@ describe("RunDiff", () => {
       // Verify outputs were set correctly
       expect(core.setOutput).toHaveBeenCalledWith(
         "job_id",
-        mockJobInfo.job_id.toString(),
+        mockJobInfo.job_id.toString()
       );
       expect(core.setOutput).toHaveBeenCalledWith(
         "html_url",
-        mockJobInfo.html_url,
+        mockJobInfo.html_url
       );
       expect(core.setOutput).toHaveBeenCalledWith(
         "result_code",
-        mockDiffResult.result_code,
+        mockDiffResult.result_code
       );
       expect(core.setOutput).toHaveBeenCalledWith(
         "summary",
-        mockDiffResult.summary,
+        mockDiffResult.summary
       );
       expect(core.setOutput).toHaveBeenCalledWith("stack", mockInputs.stack);
 
       // Verify output file was written with correct path and JSON content
       const expectedPath = path.join(
         mockInputs.working_directory,
-        mockInputs.output_filename,
+        mockInputs.output_filename
       );
       expect(fs.writeFileSync).toHaveBeenCalledTimes(1);
       expect(fs.writeFileSync).toHaveBeenCalledWith(
@@ -707,22 +706,22 @@ describe("RunDiff", () => {
           job_id: mockJobInfo.job_id.toString(),
           result_code: mockDiffResult.result_code,
           stack: mockInputs.stack,
-          summary: mockDiffResult.summary,
-        }),
+          summary: mockDiffResult.summary
+        })
       );
     });
 
     it("should not call setFailed when result_code is 0 or 2", async () => {
       const mockJobInfo = {
         job_id: 12345,
-        html_url: "https://example.com/job",
+        html_url: "https://example.com/job"
       };
       jest
         .spyOn(RunDiff.prototype, "getJobInformation")
         .mockResolvedValue(mockJobInfo);
       jest.spyOn(RunDiff.prototype, "runDiff").mockResolvedValue({
         result_code: "0",
-        summary: "No changes. Your infrastructure matches the configuration.",
+        summary: "No changes. Your infrastructure matches the configuration."
       });
 
       const runDiff = new RunDiff();

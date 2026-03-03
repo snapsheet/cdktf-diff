@@ -82,7 +82,7 @@ export class RunDiff {
       terraformVersion: core.getInput("terraform_version") || "1.8.0",
       workingDirectory: core.getInput("working_directory") || "./",
       skipSynth: core.getBooleanInput("skip_synth"),
-      artifactName: core.getInput("artifact_name"),
+      artifactName: core.getInput("artifact_name")
     };
 
     // Then create octokit with the token
@@ -108,7 +108,7 @@ export class RunDiff {
       job_id: job_id.toString(),
       result_code,
       stack: this.inputs.stack,
-      summary,
+      summary
     };
 
     // Set action outputs
@@ -119,7 +119,7 @@ export class RunDiff {
     // Write outputs to file
     const outputPath = path.join(
       this.inputs.workingDirectory,
-      this.inputs.outputFilename,
+      this.inputs.outputFilename
     );
     fs.writeFileSync(outputPath, JSON.stringify(outputs));
 
@@ -139,18 +139,18 @@ export class RunDiff {
       this.octokit.rest.actions.listJobsForWorkflowRun,
       {
         ...github.context.repo,
-        run_id: github.context.runId,
-      },
+        run_id: github.context.runId
+      }
     );
 
     const job = octokitPaginatedJobs.find(
-      (j) => j.name === this.inputs.jobName,
+      (j) => j.name === this.inputs.jobName
     );
 
     if (job) {
       return {
         job_id: job.id,
-        html_url: job.html_url || "",
+        html_url: job.html_url || ""
       };
     } else {
       throw new Error(`Could not find job with name ${this.inputs.jobName}`);
@@ -172,7 +172,7 @@ export class RunDiff {
     const diffCommand = [
       this.inputs.stubOutputFile
         ? `cat ${this.inputs.stubOutputFile}`
-        : "CI=1 npx cdktf diff",
+        : "CI=1 npx cdktf diff"
     ];
     if (this.inputs.skipSynth) diffCommand.push("--skip-synth");
     diffCommand.push(this.inputs.stack);
@@ -187,9 +187,9 @@ export class RunDiff {
           },
           stderr: (data: Buffer) => {
             output += data.toString();
-          },
+          }
         },
-        cwd: this.inputs.workingDirectory,
+        cwd: this.inputs.workingDirectory
       });
 
       // Write output to file for parsing
@@ -211,7 +211,7 @@ export class RunDiff {
    */
   private parseOutput(
     output: string,
-    exitCode: number,
+    exitCode: number
   ): {
     result_code: ActionOutputs["result_code"];
     summary: string;
@@ -219,7 +219,7 @@ export class RunDiff {
     // eslint-disable-next-line no-control-regex
     const cleanOutput = output.replace(
       /\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]/g,
-      "",
+      ""
     );
 
     if (exitCode !== 0) {
@@ -228,7 +228,7 @@ export class RunDiff {
         return {
           result_code: "1",
           summary:
-            "DynamoDB is throttling state lock requests. See run for details.",
+            "DynamoDB is throttling state lock requests. See run for details."
         };
       }
 
@@ -236,25 +236,25 @@ export class RunDiff {
       if (cleanOutput.includes("Error acquiring the state lock")) {
         return {
           result_code: "1",
-          summary: "Error acquiring the state lock. See run for details.",
+          summary: "Error acquiring the state lock. See run for details."
         };
       }
 
       // Default
       return {
         result_code: "1",
-        summary: `Plan failed with exit code ${exitCode}. See run for details.`,
+        summary: `Plan failed with exit code ${exitCode}. See run for details.`
       };
     }
 
     if (
       cleanOutput.includes(
-        "No changes. Your infrastructure matches the configuration.",
+        "No changes. Your infrastructure matches the configuration."
       )
     ) {
       return {
         result_code: "0",
-        summary: "No changes. Your infrastructure matches the configuration.",
+        summary: "No changes. Your infrastructure matches the configuration."
       };
     }
 
