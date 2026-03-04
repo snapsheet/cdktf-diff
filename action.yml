@@ -53,7 +53,7 @@ runs:
       with:
         terraform_version: ${{ inputs.terraform_version }}
 
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
       id: checkout
       with:
         fetch-depth: 0
